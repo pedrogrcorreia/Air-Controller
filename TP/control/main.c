@@ -4,13 +4,19 @@
 #include <stdio.h>
 #include <fcntl.h> 
 #include <io.h>
+#include <stdbool.h>
+#include "aeroporto.h"
+
+#define BUFFER 200
 
 int _tmain(int argc, TCHAR* argv[]) {
-
+	Aeroporto* aeroportos;
 	HANDLE semaforo_execucao;
 	HKEY chave = NULL;
-	DWORD result = 0, cbdata = 0;
-	DWORD MAXAE = 0, MAXAV = 0;
+	DWORD result = 0, cbdata = sizeof(DWORD);
+	int maxae = 0, maxav = 0, numae = 0, numav = 0;
+	TCHAR cmd[BUFFER] = TEXT("");
+
 #ifdef UNICODE 
 	if (_setmode(_fileno(stdin), _O_WTEXT) == -1) {
 		perror("Impossivel user _setmode()");
@@ -23,6 +29,8 @@ int _tmain(int argc, TCHAR* argv[]) {
 	}
 #endif
 
+	// Verifica se já está alguma instância em execução
+
 	semaforo_execucao = CreateSemaphore(NULL, 0, 1, TEXT("Semáforo Execução"));
 	result = GetLastError();
 	if (result == ERROR_ALREADY_EXISTS) {
@@ -30,25 +38,52 @@ int _tmain(int argc, TCHAR* argv[]) {
 		return -1;
 	}
 
+	// Verifica se a chave abre
+
 	RegOpenKeyEx(HKEY_CURRENT_USER, TEXT("SOFTWARE\\temp\\SO2\\TP"), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, &chave);
-	result = GetLastError();
-	_tprintf(TEXT("%ld\n"), result);
-	if (chave == NULL) {
-		MAXAE = 3;
-		MAXAV = 7;
-	}
-	else {
-		//_tprintf(TEXT("NAO ABRI A CHAVE!!\n"));
-	}
 
-	RegQueryValueEx(chave, TEXT("MAXAE"), NULL, NULL, (LPBYTE)&MAXAE, (LPDWORD)&cbdata);
-	RegQueryValueEx(chave, TEXT("MAXAV"), NULL, NULL, (LPBYTE)&MAXAV, (LPDWORD)&cbdata);
+	// Obter o numero maximo de aeroportos e avioes
 
-	result = GetLastError();
-	_tprintf(TEXT("%ld\n"), ERROR_SUCCESS);
-	_tprintf(TEXT("%ld\n"), result);
-	_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), MAXAE);
-	_tprintf(TEXT("NUMERO MAXIMO DE AVIOES: %ld\n"), MAXAV);
+	RegQueryValueEx(chave, TEXT("MAXAE"), NULL, NULL, (LPBYTE)&maxae, (LPDWORD)&cbdata);
+	RegQueryValueEx(chave, TEXT("MAXAV"), NULL, NULL, (LPBYTE)&maxav, (LPDWORD)&cbdata);
+
+	// Debug tirar depois
+	_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), maxae);
+	_tprintf(TEXT("NUMERO MAXIMO DE AVIOES: %ld\n"), maxav);
+
+	aeroportos = malloc(sizeof(Aeroporto) * maxae);
+	memset(aeroportos, 0, (size_t)maxae * sizeof(Aeroporto));
+
+
+	// Imprimir menu
+
+	do {
+		_tprintf(TEXT("Introduza a opção do comando que pretende executar: \n"));
+		_tprintf(TEXT("1. Criar aeroporto\n2. Suspender/Ativar registo de aviões\n3. Listar tudo\n"));
+		_tprintf(TEXT("Opção: "));
+		_fgetts(cmd, BUFFER, stdin);
+		int cmdOpt = _tstoi(cmd);
+		switch (cmdOpt) {
+			case 1:
+				if (criaAeroporto(aeroportos, &numae, maxae)) {
+				}
+				break;
+			case 3:
+				for (int i = 0; i < numae; i++) {
+					_tprintf(TEXT("Aeroporto %d: %s, localizado em %d, %d\n"), i, aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
+				}
+				break;
+		}
+
+	} while (_tcsicmp(cmd, TEXT("fim\n")) != 0);
+
+	//hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)LeCmd, NULL, NULL, NULL);
+	//if (hThread == NULL) {
+	//	_tprintf(TEXT("Impossível lançar a thread para ler os comandos do utilizador.\n"));
+	//}
+
+	//WaitForSingleObject(hThread, INFINITE);
+
 
 
 	return 0;
