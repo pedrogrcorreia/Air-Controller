@@ -44,8 +44,16 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 	// Obter o numero maximo de aeroportos e avioes
 
-	RegQueryValueEx(chave, TEXT("MAXAE"), NULL, NULL, (LPBYTE)&maxae, (LPDWORD)&cbdata);
-	RegQueryValueEx(chave, TEXT("MAXAV"), NULL, NULL, (LPBYTE)&maxav, (LPDWORD)&cbdata);
+	result = RegQueryValueEx(chave, TEXT("MAXAE"), NULL, NULL, (LPBYTE)&maxae, (LPDWORD)&cbdata);
+	if (result != ERROR_SUCCESS) {
+		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aeroportos.\nVai ser definido como 10.\n"));
+		maxae = 10;
+	}
+	result = RegQueryValueEx(chave, TEXT("MAXAV"), NULL, NULL, (LPBYTE)&maxav, (LPDWORD)&cbdata);
+	if (result != ERROR_SUCCESS) {
+		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aviões.\nVai ser definido como 20.\n"));
+		maxav = 20;
+	}
 
 	// Debug tirar depois
 	_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), maxae);
@@ -65,12 +73,11 @@ int _tmain(int argc, TCHAR* argv[]) {
 		int cmdOpt = _tstoi(cmd);
 		switch (cmdOpt) {
 			case 1:
-				if (criaAeroporto(aeroportos, &numae, maxae)) {
-				}
+				criaAeroporto(aeroportos, &numae, maxae);
 				break;
 			case 3:
 				for (int i = 0; i < numae; i++) {
-					_tprintf(TEXT("Aeroporto %d: %s, localizado em %d, %d\n"), i, aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
+					_tprintf(TEXT("Aeroporto %d: %s, localizado em %d, %d.\n"), i+1, aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
 				}
 				break;
 		}
