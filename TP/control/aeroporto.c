@@ -28,10 +28,12 @@ bool criaAeroporto(Aeroporto* aeroportos, int* numae, int maxae) {
 		_tprintf(TEXT("Não pode adicionar um aeroporto nessas coordenadas.\n"));
 		return false;
 	}
+
 	if (*numae >= maxae) {
 		_tprintf(TEXT("Não pode adicionar mais aeroportos.\n"));
 		return false;
 	}
+
 	_tcscpy_s(aeroportos[*numae].nome, BUFFER, nome);
 	aeroportos[*numae].x = x;
 	aeroportos[*numae].y = y;
