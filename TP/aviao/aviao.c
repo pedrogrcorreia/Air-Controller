@@ -40,7 +40,6 @@ int _tmain(int argc, TCHAR* argv[]) {
 	
 	_tprintf(TEXT("%d\n"), ptr_memoria->naeroportos);
 	_tprintf(TEXT("%d\n"), ptr_memoria->navioes);
-	_tprintf(TEXT("%s\n"), ptr_memoria->aeroportos[0].nome);
 	//CopyMemory(&novo, &ptr_memoria->aeroportos[ptr_memoria->naeroportos], sizeof(Aeroporto));
 	//_tprintf(TEXT("%d\n"), ptr_memoria->aeroportos->x);
 	//_tprintf(TEXT("%d\n"), novo.x);

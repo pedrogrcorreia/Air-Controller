@@ -11,8 +11,9 @@
 
 int _tmain(int argc, TCHAR* argv[]) {
 	Aeroporto* aeroportos;
-	HANDLE semaforo_execucao;
-	HKEY chave = NULL;
+	Memoria* ptr_memoria;
+	HANDLE semaforo_execucao, objMap;
+	HKEY chaveMAX = NULL, chaveAeroportos = NULL;
 	DWORD result = 0, cbdata = sizeof(DWORD);
 	int maxae = 0, maxav = 0, numae = 0, numav = 0;
 	TCHAR cmd[BUFFER] = TEXT("");
@@ -40,16 +41,16 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 	// Verifica se a chave abre
 
-	RegOpenKeyEx(HKEY_CURRENT_USER, TEXT("SOFTWARE\\temp\\SO2\\TP"), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, &chave);
+	RegOpenKeyEx(HKEY_CURRENT_USER, TEXT("SOFTWARE\\temp\\SO2\\TP"), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, &chaveMAX);
 
 	// Obter o numero maximo de aeroportos e avioes
 
-	result = RegQueryValueEx(chave, TEXT("MAXAE"), NULL, NULL, (LPBYTE)&maxae, (LPDWORD)&cbdata);
+	result = RegQueryValueEx(chaveMAX, TEXT("MAXAE"), NULL, NULL, (LPBYTE)&maxae, (LPDWORD)&cbdata);
 	if (result != ERROR_SUCCESS) {
 		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aeroportos.\nVai ser definido como 10.\n"));
 		maxae = 10;
 	}
-	result = RegQueryValueEx(chave, TEXT("MAXAV"), NULL, NULL, (LPBYTE)&maxav, (LPDWORD)&cbdata);
+	result = RegQueryValueEx(chaveMAX, TEXT("MAXAV"), NULL, NULL, (LPBYTE)&maxav, (LPDWORD)&cbdata);
 	if (result != ERROR_SUCCESS) {
 		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aviões.\nVai ser definido como 20.\n"));
 		maxav = 20;
@@ -58,6 +59,18 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// Debug tirar depois
 	_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), maxae);
 	_tprintf(TEXT("NUMERO MAXIMO DE AVIOES: %ld\n"), maxav);
+
+	// Registar ou abrir chave para registo de aeroportos
+	RegCreateKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chaveAeroportos, NULL);
+
+	objMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(Memoria), MEMORIA);
+	if (objMap == NULL) {
+		return -1;
+	}
+	ptr_memoria = (Memoria*)MapViewOfFile(objMap, FILE_MAP_WRITE | FILE_MAP_READ, 0, 0, 0);
+	if (ptr_memoria == NULL) {
+		return -1;
+	}
 
 	aeroportos = malloc(sizeof(Aeroporto) * maxae);
 	memset(aeroportos, 0, (size_t)maxae * sizeof(Aeroporto));
@@ -73,10 +86,12 @@ int _tmain(int argc, TCHAR* argv[]) {
 		int cmdOpt = _tstoi(cmd);
 		switch (cmdOpt) {
 			case 1:
-				criaAeroporto(aeroportos, &numae, maxae);
+				if (criaAeroporto(aeroportos, &ptr_memoria->naeroportos, maxae)) {
+					RegistaAeroporto(aeroportos[ptr_memoria->naeroportos-1], chaveAeroportos);
+				}
 				break;
 			case 3:
-				for (int i = 0; i < numae; i++) {
+				for (int i = 0; i < ptr_memoria->naeroportos; i++) {
 					_tprintf(TEXT("Aeroporto %d: %s, localizado em %d, %d.\n"), i+1, aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
 				}
 				break;

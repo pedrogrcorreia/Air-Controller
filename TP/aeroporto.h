@@ -10,6 +10,9 @@ typedef struct {
 // Cria aeroportos
 bool criaAeroporto(Aeroporto* aeroportos, int* numae, int maxae);
 
+// Regista aeroporto no Registry
+bool RegistaAeroporto(Aeroporto novo, HANDLE chave);
+
 // Verifica se o nome do novo aeroporto ainda não existe
 bool checkNome(TCHAR nome[], Aeroporto* aeroportos, int numae);
 
