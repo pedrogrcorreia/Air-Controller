@@ -1,4 +1,3 @@
-#include "aeroporto.h"
 #include <windows.h>
 #include <tchar.h>
 #include <math.h>
@@ -6,6 +5,7 @@
 #include <fcntl.h> 
 #include <io.h>
 #include <stdbool.h>
+#include "../aeroporto.h"
 
 bool criaAeroporto(Aeroporto* aeroportos, int* numae, int maxae) {
 	TCHAR nome[BUFFER];

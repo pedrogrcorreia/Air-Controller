@@ -5,7 +5,7 @@
 #include <fcntl.h> 
 #include <io.h>
 #include <stdbool.h>
-#include "aeroporto.h"
+#include "../util.h"
 
 #define BUFFER 200
 

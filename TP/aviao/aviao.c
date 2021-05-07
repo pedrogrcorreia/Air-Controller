@@ -5,7 +5,7 @@
 #include <fcntl.h> 
 #include <io.h>
 #include <stdbool.h>
-#include "util.h"
+#include "../util.h"
 
 #define BUFFER 200
 

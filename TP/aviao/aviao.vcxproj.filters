@@ -15,14 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\control\aeroporto.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\control\aeroporto.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="aviao.c">
       <Filter>Source Files</Filter>
     </ClCompile>

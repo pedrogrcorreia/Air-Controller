@@ -5,6 +5,14 @@ VisualStudioVersion = 16.0.31019.35
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "control", "control\control.vcxproj", "{6FFE2074-3B39-4891-8E2A-072BFDB3BA2F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "aviao", "aviao\aviao.vcxproj", "{AEB87193-CE98-4394-85D2-A430D261B7C3}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{46DBDE76-1A5C-46FA-99B8-A2797F4E828A}"
+	ProjectSection(SolutionItems) = preProject
+		aeroporto.h = aeroporto.h
+		util.h = util.h
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +29,14 @@ Global
 		{6FFE2074-3B39-4891-8E2A-072BFDB3BA2F}.Release|x64.Build.0 = Release|x64
 		{6FFE2074-3B39-4891-8E2A-072BFDB3BA2F}.Release|x86.ActiveCfg = Release|Win32
 		{6FFE2074-3B39-4891-8E2A-072BFDB3BA2F}.Release|x86.Build.0 = Release|Win32
+		{AEB87193-CE98-4394-85D2-A430D261B7C3}.Debug|x64.ActiveCfg = Debug|x64
+		{AEB87193-CE98-4394-85D2-A430D261B7C3}.Debug|x64.Build.0 = Debug|x64
+		{AEB87193-CE98-4394-85D2-A430D261B7C3}.Debug|x86.ActiveCfg = Debug|Win32
+		{AEB87193-CE98-4394-85D2-A430D261B7C3}.Debug|x86.Build.0 = Debug|Win32
+		{AEB87193-CE98-4394-85D2-A430D261B7C3}.Release|x64.ActiveCfg = Release|x64
+		{AEB87193-CE98-4394-85D2-A430D261B7C3}.Release|x64.Build.0 = Release|x64
+		{AEB87193-CE98-4394-85D2-A430D261B7C3}.Release|x86.ActiveCfg = Release|Win32
+		{AEB87193-CE98-4394-85D2-A430D261B7C3}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
