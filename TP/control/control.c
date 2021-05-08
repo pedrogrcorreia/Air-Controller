@@ -106,7 +106,14 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 	//WaitForSingleObject(hThread, INFINITE);
 
+	// Apagar as chaves dos Aeroportos antes de encerrar.
 
+	result = RegDeleteTree(chaveAeroportos, NULL);
+
+	result = RegDeleteKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, KEY_WOW64_64KEY, 0);
+	if (result == ERROR_SUCCESS) {
+		_tprintf(TEXT("Apaguei a chave dos aeroportos.\n"));
+	}
 
 	return 0;
 	

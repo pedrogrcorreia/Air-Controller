@@ -44,14 +44,14 @@ bool criaAeroporto(Aeroporto* aeroportos, int* numae, int maxae) {
 bool RegistaAeroporto(Aeroporto novo, HANDLE chave) {
 	HKEY temp;
 	TCHAR x[BUFFER], y[BUFFER];
-	TCHAR x_valor[BUFFER], y_valor[BUFFER];
+	//TCHAR x_valor[BUFFER], y_valor[BUFFER];
+	DWORD xvalor = novo.x, yvalor = novo.y;
 	RegCreateKeyEx(chave, novo.nome, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &temp, NULL);
 	_tcscpy_s(x, BUFFER, TEXT("x"));
-	_stprintf_s(x_valor, BUFFER, TEXT("%d"), novo.x);
 	_tcscpy_s(y, BUFFER, TEXT("y"));
-	_stprintf_s(y_valor, BUFFER, TEXT("%d"), novo.y);
-	RegSetValueEx(temp, (LPCWSTR)x, 0, REG_SZ, (const BYTE*)x_valor, sizeof(TCHAR) * _tcslen(x_valor));
-	RegSetValueEx(temp, (LPCWSTR)y, 0, REG_SZ, (const BYTE*)y_valor, sizeof(TCHAR) * _tcslen(y_valor));
+
+	RegSetValueEx(temp, (LPCWSTR)x, 0, REG_DWORD, (const BYTE*)&xvalor, sizeof(xvalor));
+	RegSetValueEx(temp, (LPCWSTR)y, 0, REG_DWORD, (const BYTE*)&yvalor, sizeof(yvalor));
 	RegCloseKey(temp);
 	return true;
 	
