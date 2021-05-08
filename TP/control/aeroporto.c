@@ -34,6 +34,8 @@ bool criaAeroporto(Aeroporto* aeroportos, int* numae, int maxae) {
 		return false;
 	}
 
+	// adiciona o aeroporto ao array de aeroportos
+
 	_tcscpy_s(aeroportos[*numae].nome, BUFFER, nome);
 	aeroportos[*numae].x = x;
 	aeroportos[*numae].y = y;

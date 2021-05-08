@@ -14,7 +14,8 @@ int _tmain(int argc, TCHAR* argv[]) {
 	HANDLE objMap;
 	Memoria* ptr_memoria;
 	DWORD result, cbdata = sizeof(int);
-	int x=0, y=0;
+	int x=0, y=0; // mapa
+
 #ifdef UNICODE 
 	if (_setmode(_fileno(stdin), _O_WTEXT) == -1) {
 		perror("Impossivel user _setmode()");
@@ -45,6 +46,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 		_tprintf(TEXT("DEBUG\n"));
 		return;
 	}
+
 	//Aeroporto novo;
 
 	// Abrir chave
