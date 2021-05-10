@@ -6,6 +6,7 @@
 #include <io.h>
 #include <stdbool.h>
 #include "../util.h"
+#include "SO2_TP_DLL_2021.h"
 
 #define BUFFER 200
 
@@ -23,9 +24,9 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 
 	while (!dados->ptr_memoria->terminar) {
 
-		Sleep(2000);
-		dados->self.x++;
-		dados->self.y++;
+		Sleep(1000);
+
+		move(dados->self.x, dados->self.y, 50, 50, &dados->self.x, &dados->self.y);
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 		// esperar semáforo vazio e o mutex
@@ -57,10 +58,10 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 
 int _tmain(int argc, TCHAR* argv[]) {
 	HKEY chaveAeroportos, chaveLocal;
-	HANDLE objMap;
+	HANDLE objMap, sem_control;
 	DWORD result, cbdata = sizeof(int);
 	TDados dados;
-
+	HMODULE hDLL;
 #ifdef UNICODE 
 	if (_setmode(_fileno(stdin), _O_WTEXT) == -1) {
 		perror("Impossivel user _setmode()");
@@ -72,10 +73,18 @@ int _tmain(int argc, TCHAR* argv[]) {
 		perror("Impossivel user _setmode()");
 	}
 #endif
-
+	int x = 0; int y = 0;
 	// termina se não tiver argumentos suficientes
 	if (argc < 2) {
 		_tprintf(TEXT("Número incorreto de argumentos, inicie novamente.\n"));
+		return -1;
+	}
+
+	// verifica se existe algum controlador ativo
+	sem_control = CreateSemaphore(NULL, 0, 1, SEMAFORO_CONTROLADOR);
+	result = GetLastError();
+	if (result != ERROR_ALREADY_EXISTS) {
+		_tprintf(TEXT("Não existe nenhum controlador ativo.\n"));
 		return -1;
 	}
 
@@ -95,13 +104,12 @@ int _tmain(int argc, TCHAR* argv[]) {
 		return;
 	}
 
-	_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), dados.ptr_memoria->maxaeroportos);
-	_tprintf(TEXT("NUMERO MAXIMO DE AVIOES: %ld\n"), dados.ptr_memoria->maxavioes);
+	// inicializa semáforo para controlar instâncias de aviões
+	dados.sem_avioes = CreateSemaphore(NULL, dados.ptr_memoria->maxavioes, dados.ptr_memoria->maxavioes, SEMAFORO_INSTANCIAS);
 
-	// abre os semáforos e o mutex do controlador
+	// inicializa os semáforos, mutex para o modelo produtor - consumidor
 	dados.sem_itens = CreateSemaphore(NULL, 0, dados.ptr_memoria->maxavioes, SEMAFORO_ITENS);
 	dados.sem_vazios = CreateSemaphore(NULL, dados.ptr_memoria->maxavioes, dados.ptr_memoria->maxavioes, SEMAFORO_VAZIOS);
-	dados.sem_avioes = CreateSemaphore(NULL, dados.ptr_memoria->maxavioes, dados.ptr_memoria->maxavioes, SEMAFORO_INSTANCIAS);
 	dados.mutex = CreateMutex(NULL, FALSE, MUTEX_CONTROL);
 
 	// abrir chave dos aeroportos
@@ -166,13 +174,9 @@ int _tmain(int argc, TCHAR* argv[]) {
 	hThread[0] = CreateThread(NULL, 0, DeslocaAviao, &dados, 0, NULL);
 	hThread[1] = CreateThread(NULL, 0, termina, NULL, 0, NULL);
 	result = WaitForMultipleObjects(2, hThread, FALSE, INFINITE);
-	if (result == WAIT_OBJECT_0) {
-		_tprintf(TEXT("desloca\n"));
-	}
-	else {
-		_tprintf(TEXT("termina\n"));
-	}
 
+	// retira o avião
+	dados.ptr_memoria->navioes -= 1;
 	// assinala semáforo quando termina para dar lugar a outro avião
 	ReleaseSemaphore(dados.sem_avioes, 1, &dados.ptr_memoria->navioes);
 	_tprintf(TEXT("FIM\n"));

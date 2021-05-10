@@ -33,5 +33,6 @@ typedef struct {
 	HANDLE sem_vazios;
 	HANDLE sem_itens;
 	HANDLE mutex;
+	bool suspend;
 	int id;
 } TDados;

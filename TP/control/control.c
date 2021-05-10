@@ -8,6 +8,15 @@
 #include "../util.h"
 
 #define BUFFER 200
+
+DWORD WINAPI suspend(LPVOID param) {
+	TDados* dados = (TDados*)param;
+	for (int i = dados->ptr_memoria->navioes; i < dados->ptr_memoria->maxavioes; i++) {
+		WaitForSingleObject(dados->sem_avioes, INFINITE);
+	}
+	return 0;
+}
+
 DWORD WINAPI RecebeAvioes(LPVOID param) {
 	TDados* dados = (TDados*)param;
 	Aviao aviao;
@@ -102,24 +111,28 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 	// inicializar a condição de paragem a null
 	dados.ptr_memoria->terminar = false;
+	dados.ptr_memoria->navioes = 0;
+	dados.ptr_memoria->naeroportos = 0;
 
 	// Debug tirar depois
 	_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), dados.ptr_memoria->maxaeroportos);
 	_tprintf(TEXT("NUMERO MAXIMO DE AVIOES: %ld\n"), dados.ptr_memoria->maxavioes);
+	_tprintf(TEXT("NUMERO DE AEROPORTOS: %ld\n"), dados.ptr_memoria->naeroportos);
+	_tprintf(TEXT("NUMERO DE AVIOES: %ld\n"), dados.ptr_memoria->navioes);
 
 	// registar ou abrir chave para registo de aeroportos
 	RegCreateKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chaveAeroportos, NULL);
 
 	// inicializa array de aeroportos
-	aeroportos = malloc(sizeof(Aeroporto) * dados.ptr_memoria->maxavioes);
-	memset(aeroportos, 0, (size_t)dados.ptr_memoria->maxavioes * sizeof(Aeroporto));
+	aeroportos = malloc(sizeof(Aeroporto) * dados.ptr_memoria->maxaeroportos);
+	memset(aeroportos, 0, (size_t)dados.ptr_memoria->maxaeroportos * sizeof(Aeroporto));
 
 	// lança thread para controlar a entrada de aviões
 	hThread = CreateThread(NULL, 0, RecebeAvioes, &dados, 0, NULL);
 
 	// imprimir menu
 
-	bool suspend = false;
+	dados.suspend = false;
 
 	do {
 		_tprintf(TEXT("Introduza a opção do comando que pretende executar: \n"));
@@ -131,6 +144,26 @@ int _tmain(int argc, TCHAR* argv[]) {
 		case 1:
 			if (criaAeroporto(aeroportos, &dados.ptr_memoria->naeroportos, dados.ptr_memoria->maxavioes)) {
 				RegistaAeroporto(aeroportos[dados.ptr_memoria->naeroportos - 1], chaveAeroportos);
+			}
+			break;
+		case 2:
+			HANDLE susThread;
+			if (!dados.suspend) {
+				susThread = CreateThread(NULL, 0, suspend, &dados, 0, NULL);
+				dados.suspend = true;
+				_tprintf(TEXT("Registo de aviões suspensos.\n"));
+			}
+			else {
+				int release = 0;
+				if (dados.ptr_memoria->maxavioes - dados.ptr_memoria->navioes < 0) {
+					release = 0;
+				}
+				else {
+					release = dados.ptr_memoria->maxavioes - dados.ptr_memoria->navioes;
+				}
+				ReleaseSemaphore(dados.sem_avioes, release, NULL);
+				dados.suspend = false;
+				_tprintf(TEXT("Registo de aviões ativo.\n"));
 			}
 			break;
 		case 3:
