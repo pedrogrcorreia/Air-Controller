@@ -9,6 +9,18 @@
 
 #define BUFFER 200
 
+void listaAeroportos(Aeroporto aeroportos[], int nae) {
+	for (int i = 0; i < nae; i++) {
+		_tprintf(TEXT("Aeroporto %s, localizado em %d, %d.\n"), aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
+	}
+}
+
+void listaAvioes(Aviao avioes[], int nav) {
+	for (int i = 0; i < nav; i++) {
+		_tprintf(TEXT("Avião %d na posição %d, %d.\n"), avioes[i].id, avioes[i].x, avioes[i].y);
+	}
+}
+
 DWORD WINAPI suspend(LPVOID param) {
 	TDados* dados = (TDados*)param;
 	for (int i = dados->ptr_memoria->navioes; i < dados->ptr_memoria->maxavioes; i++) {
@@ -17,17 +29,22 @@ DWORD WINAPI suspend(LPVOID param) {
 	return 0;
 }
 
+//DWORD WINAPI evento(LPVOID param) {
+//	TDados* dados = (TDados*)param;
+//	WaitForSingleObject(dados->evento, INFINITE);
+//	_tprintf(TEXT("Avião chegou ao aeroporto de destino.\n"));
+//}
+
 DWORD WINAPI RecebeAvioes(LPVOID param) {
 	TDados* dados = (TDados*)param;
 	Aviao aviao;
-
+	DWORD result;
 	while (!dados->ptr_memoria->terminar) {
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 		// esperar semáforo dos aviões
 		WaitForSingleObject(dados->sem_itens, INFINITE);
-
 		// copiar o aviao recebido
 		CopyMemory(&aviao, &dados->ptr_memoria->avioes[dados->ptr_memoria->entAviao], sizeof(Aviao));
 		dados->ptr_memoria->entAviao++; 
@@ -108,6 +125,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	dados.sem_itens = CreateSemaphore(NULL, 0, dados.ptr_memoria->maxavioes, SEMAFORO_ITENS);
 	dados.sem_vazios = CreateSemaphore(NULL, dados.ptr_memoria->maxavioes, dados.ptr_memoria->maxavioes, SEMAFORO_VAZIOS);
 	dados.mutex = CreateMutex(NULL, FALSE, MUTEX_CONTROL);
+	//dados.evento = CreateEvent(NULL, FALSE, FALSE, EVENTO);
 
 	// inicializar a condição de paragem a null
 	dados.ptr_memoria->terminar = false;
@@ -130,6 +148,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// lança thread para controlar a entrada de aviões
 	hThread = CreateThread(NULL, 0, RecebeAvioes, &dados, 0, NULL);
 
+	/*HANDLE hThreadd = CreateThread(NULL, 0, evento, &dados, 0, NULL);*/
 	// imprimir menu
 
 	dados.suspend = false;
@@ -147,7 +166,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 			}
 			break;
 		case 2:
-			HANDLE susThread;
+			HANDLE susThread; 
 			if (!dados.suspend) {
 				susThread = CreateThread(NULL, 0, suspend, &dados, 0, NULL);
 				dados.suspend = true;
@@ -167,9 +186,8 @@ int _tmain(int argc, TCHAR* argv[]) {
 			}
 			break;
 		case 3:
-			for (int i = 0; i < dados.ptr_memoria->naeroportos; i++) {
-				_tprintf(TEXT("Aeroporto %d: %s, localizado em %d, %d.\n"), i + 1, aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
-			}
+			listaAeroportos(aeroportos, dados.ptr_memoria->naeroportos);
+			listaAvioes(dados.ptr_memoria->avioes, dados.ptr_memoria->navioes);
 			break;
 		case 4:
 			_tprintf(TEXT("N avioes: %d\n"), dados.ptr_memoria->navioes);

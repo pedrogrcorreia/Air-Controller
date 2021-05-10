@@ -10,7 +10,7 @@
 
 #define BUFFER 200
 
-DWORD WINAPI termina(LPVOID param) {
+DWORD WINAPI leCmd(LPVOID param) {
 	TCHAR debug[100];
 	while (1) {
 		_getts_s(debug, 100);
@@ -24,9 +24,10 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 
 	while (!dados->ptr_memoria->terminar) {
 
-		Sleep(1000);
+		//Sleep(1000);
 
-		move(dados->self.x, dados->self.y, 50, 50, &dados->self.x, &dados->self.y);
+		move(dados->self.x, dados->self.y, dados->self.destino.x, dados->self.destino.y, &dados->self.x, &dados->self.y);
+
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 		// esperar semáforo vazio e o mutex
@@ -50,6 +51,10 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
+		if ((dados->self.x == dados->self.destino.x) && (dados->self.y == dados->self.destino.y)) {
+			break;
+		}
+
 		_tprintf(TEXT("Aviao na posicao %d %d\n"), dados->self.x, dados->self.y);
 	}
 	return 0;
@@ -61,7 +66,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	HANDLE objMap, sem_control;
 	DWORD result, cbdata = sizeof(int);
 	TDados dados;
-	HMODULE hDLL;
+	TCHAR cmd[BUFFER];
 #ifdef UNICODE 
 	if (_setmode(_fileno(stdin), _O_WTEXT) == -1) {
 		perror("Impossivel user _setmode()");
@@ -73,7 +78,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 		perror("Impossivel user _setmode()");
 	}
 #endif
-	int x = 0; int y = 0;
+
 	// termina se não tiver argumentos suficientes
 	if (argc < 2) {
 		_tprintf(TEXT("Número incorreto de argumentos, inicie novamente.\n"));
@@ -141,15 +146,18 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// obter o ID do processo
 	dados.self.id = GetCurrentProcessId();
 
+	// esperar pelo semáforo das instâncias do avião
+	WaitForSingleObject(dados.sem_avioes, INFINITE);
+	
+	
 	// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 	// esperar pelo semáforo das posições vazias e do mutex
-	WaitForSingleObject(dados.sem_avioes, INFINITE);
 	WaitForSingleObject(dados.sem_vazios, INFINITE);
 	WaitForSingleObject(dados.mutex, INFINITE);
 
 	// incrementar número de aviões
-	dados.ptr_memoria->navioes += 1;
+	dados.ptr_memoria->navioes++;
 
 	// copiar para a memória o avião criado
 	CopyMemory(&dados.ptr_memoria->avioes[dados.ptr_memoria->saiAviao], &dados.self, sizeof(Aviao));
@@ -167,17 +175,54 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 	// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
+	// DEBUG
 	_tprintf(TEXT("Aviao %d\n"), dados.self.id);
+
+	// comandos
+
+	//do {
+	//	_tprintf(TEXT("Introduza o comando que pretende.\n"));
+	//	_fgetts(cmd, BUFFER, stdin);
+	//} while(_tcsicmp(cmd, TEXT("fim\n")) != 0);
+
+
+	// Aeroporto de destino
+	TCHAR aeroportoDestino[BUFFER] = TEXT("Porto");
+	HKEY chaveDestino;
+	RegCreateKeyEx(chaveAeroportos, aeroportoDestino, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chaveDestino, &result);
+	if (result == REG_CREATED_NEW_KEY) {
+		_tprintf(TEXT("Não existe nenhum aeroporto com esse nome.\n"));
+		return -1;
+	}
+
+	result = RegQueryValueEx(chaveDestino, TEXT("x"), NULL, NULL, (LPBYTE)&dados.self.destino.x, (LPDWORD)&cbdata);
+	if (result != ERROR_SUCCESS) {
+		_tprintf(TEXT("Impossivel ler o valor de x.\n"));
+		return -1;
+	}
+	result = RegQueryValueEx(chaveDestino, TEXT("y"), NULL, NULL, (LPBYTE)&dados.self.destino.y, (LPDWORD)&cbdata);
+	if (result != ERROR_SUCCESS) {
+		_tprintf(TEXT("Impossivel ler o valor de y.\n"));
+		return -1;
+	}
 
 	// lança thread para deslocar o aviao e para terminar o programa
 	HANDLE hThread[2];
 	hThread[0] = CreateThread(NULL, 0, DeslocaAviao, &dados, 0, NULL);
-	hThread[1] = CreateThread(NULL, 0, termina, NULL, 0, NULL);
+	hThread[1] = CreateThread(NULL, 0, leCmd, NULL, 0, NULL);
 	result = WaitForMultipleObjects(2, hThread, FALSE, INFINITE);
 
 	// retira o avião
-	dados.ptr_memoria->navioes -= 1;
+	WaitForSingleObject(dados.mutex, INFINITE);
+	dados.ptr_memoria->navioes--;
+	ReleaseMutex(dados.mutex);
+
+	// DEBUG
+	_tprintf(TEXT("%d\n"), dados.ptr_memoria->navioes);
+	_tprintf(TEXT("Aviao %d, %d, %d.\n"), dados.self.id, dados.self.x, dados.self.y);
+
 	// assinala semáforo quando termina para dar lugar a outro avião
 	ReleaseSemaphore(dados.sem_avioes, 1, &dados.ptr_memoria->navioes);
+	Sleep(5000);
 	_tprintf(TEXT("FIM\n"));
 }

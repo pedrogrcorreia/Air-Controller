@@ -7,32 +7,35 @@
 #define SEMAFORO_ITENS TEXT("Semáforo dos itens")
 #define SEMAFORO_VAZIOS TEXT("Semáforo das posições vazias")
 #define MUTEX_CONTROL TEXT("Mutex do controlador")
+#define EVENTO TEXT("Evento para chegada")
 
 typedef struct {
 	DWORD id;
 	int x;
 	int y;
+	Aeroporto inicial;
+	Aeroporto destino;
 } Aviao;
 
 typedef struct {
-	int mapa[50][50];
+	int mapa[1000][1000];
 	int maxaeroportos;
 	int maxavioes;
 	int naeroportos;
 	int navioes;
-	int entAviao;
-	int saiAviao;
-	bool terminar;
-	Aviao avioes[];
+	int entAviao; // controlo do modelo produtor - consumidor
+	int saiAviao; // controlo do modelo produtor - consumidor
+	bool terminar; // condição de paragem do programa
+	Aviao avioes[]; // array de avioes, onde vao ser colocados os "itens" do modelo produtor - consumidor
 } Memoria;
 
 typedef struct {
 	Aviao self;
 	Memoria* ptr_memoria;
-	HANDLE sem_avioes;
-	HANDLE sem_vazios;
-	HANDLE sem_itens;
-	HANDLE mutex;
+	HANDLE sem_avioes; // semáforo de instâncias de avião a correr
+	HANDLE sem_vazios; // posições vazios do modelo produtor - consumidor
+	HANDLE sem_itens; // itens do modelo produtor - consumidor
+	HANDLE mutex; // mutex para o modelo produtor - consumidor
 	bool suspend;
 	int id;
 } TDados;
