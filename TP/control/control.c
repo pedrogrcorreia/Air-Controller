@@ -8,16 +8,44 @@
 #include "../util.h"
 
 #define BUFFER 200
+DWORD WINAPI RecebeAvioes(LPVOID param) {
+	TDados* dados = (TDados*)param;
+	Aviao aviao;
+
+	while (!dados->ptr_memoria->terminar) {
+
+		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
+
+		// esperar semáforo dos aviões
+		WaitForSingleObject(dados->sem_avioes, INFINITE);
+
+		// copiar o aviao recebido
+		CopyMemory(&aviao, &dados->ptr_memoria->avioes[dados->ptr_memoria->entAviao], sizeof(Aviao));
+		dados->ptr_memoria->entAviao++; 
+
+		// reset do buffer
+		if (dados->ptr_memoria->entAviao == dados->ptr_memoria->maxavioes) {
+			dados->ptr_memoria->entAviao = 0;
+		}
+
+		// assinala semáforo
+		ReleaseSemaphore(dados->sem_vazios, 1, NULL);
+
+		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
+
+		_tprintf(TEXT("Aviao %d na posicao %d, %d.\n"), aviao.id, aviao.x, aviao.y);
+	}
+	return 0;
+}
+
 
 int _tmain(int argc, TCHAR* argv[]) {
 	Aeroporto* aeroportos;
-	Memoria* ptr_memoria;
-	HANDLE semaforo_execucao, objMap;
+	HANDLE semaforo_execucao, objMap, hThread;
 	HKEY chaveMAX = NULL, chaveAeroportos = NULL;
 	DWORD result = 0, cbdata = sizeof(DWORD);
-	int maxae = 0, maxav = 0, numae = 0, numav = 0;
 	TCHAR cmd[BUFFER] = TEXT("");
-
+	TDados dados;
 #ifdef UNICODE 
 	if (_setmode(_fileno(stdin), _O_WTEXT) == -1) {
 		perror("Impossivel user _setmode()");
@@ -30,7 +58,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	}
 #endif
 
-	// Verifica se já está alguma instância em execução
+	// verifica se já está alguma instância em execução
 
 	semaforo_execucao = CreateSemaphore(NULL, 0, 1, TEXT("Semáforo Execução"));
 	result = GetLastError();
@@ -39,44 +67,53 @@ int _tmain(int argc, TCHAR* argv[]) {
 		return -1;
 	}
 
-	// Verifica se a chave abre
-
-	RegOpenKeyEx(HKEY_CURRENT_USER, TEXT("SOFTWARE\\temp\\SO2\\TP"), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, &chaveMAX);
-
-	// Obter o numero maximo de aeroportos e avioes
-
-	result = RegQueryValueEx(chaveMAX, TEXT("MAXAE"), NULL, NULL, (LPBYTE)&maxae, (LPDWORD)&cbdata);
-	if (result != ERROR_SUCCESS) {
-		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aeroportos.\nVai ser definido como 10.\n"));
-		maxae = 10;
-	}
-	result = RegQueryValueEx(chaveMAX, TEXT("MAXAV"), NULL, NULL, (LPBYTE)&maxav, (LPDWORD)&cbdata);
-	if (result != ERROR_SUCCESS) {
-		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aviões.\nVai ser definido como 20.\n"));
-		maxav = 20;
-	}
-
-	// Debug tirar depois
-	_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), maxae);
-	_tprintf(TEXT("NUMERO MAXIMO DE AVIOES: %ld\n"), maxav);
-
-	// Registar ou abrir chave para registo de aeroportos
-	RegCreateKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chaveAeroportos, NULL);
-
 	objMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(Memoria), MEMORIA);
 	if (objMap == NULL) {
 		return -1;
 	}
-	ptr_memoria = (Memoria*)MapViewOfFile(objMap, FILE_MAP_WRITE | FILE_MAP_READ, 0, 0, 0);
-	if (ptr_memoria == NULL) {
+
+	dados.ptr_memoria = (Memoria*)MapViewOfFile(objMap, FILE_MAP_WRITE | FILE_MAP_READ, 0, 0, 0);
+	if (dados.ptr_memoria == NULL) {
 		return -1;
 	}
 
-	aeroportos = malloc(sizeof(Aeroporto) * maxae);
-	memset(aeroportos, 0, (size_t)maxae * sizeof(Aeroporto));
+	// verifica se a chave abre
 
+	RegOpenKeyEx(HKEY_CURRENT_USER, TEXT("SOFTWARE\\temp\\SO2\\TP"), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, &chaveMAX);
 
-	// Imprimir menu
+	// obter o numero maximo de aeroportos e avioes
+
+	result = RegQueryValueEx(chaveMAX, TEXT("MAXAE"), NULL, NULL, (LPBYTE)&dados.ptr_memoria->maxaeroportos, (LPDWORD)&cbdata);
+	if (result != ERROR_SUCCESS) {
+		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aeroportos.\nVai ser definido como 10.\n"));
+		dados.ptr_memoria->maxaeroportos = 10;
+	}
+	result = RegQueryValueEx(chaveMAX, TEXT("MAXAV"), NULL, NULL, (LPBYTE)&dados.ptr_memoria->maxavioes, (LPDWORD)&cbdata);
+	if (result != ERROR_SUCCESS) {
+		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aviões.\nVai ser definido como 20.\n"));
+		dados.ptr_memoria->maxavioes = 10;
+	}
+
+	// inicializa os semáforos, mutex e a condição de paragem
+	dados.sem_avioes = CreateSemaphore(NULL, 0, dados.ptr_memoria->maxavioes, SEMAFORO_AVIOES);
+	dados.sem_vazios = CreateSemaphore(NULL, dados.ptr_memoria->maxavioes, dados.ptr_memoria->maxavioes, SEMAFORO_VAZIOS);
+	dados.mutex = CreateMutex(NULL, FALSE, MUTEX_CONTROL);
+	dados.ptr_memoria->terminar = false;
+
+	// Debug tirar depois
+	_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), dados.ptr_memoria->maxaeroportos);
+	_tprintf(TEXT("NUMERO MAXIMO DE AVIOES: %ld\n"), dados.ptr_memoria->maxavioes);
+
+	// registar ou abrir chave para registo de aeroportos
+	RegCreateKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chaveAeroportos, NULL);
+
+	// inicializa array de aeroportos
+	aeroportos = malloc(sizeof(Aeroporto) * dados.ptr_memoria->maxavioes);
+	memset(aeroportos, 0, (size_t)dados.ptr_memoria->maxavioes * sizeof(Aeroporto));
+
+	hThread = CreateThread(NULL, 0, RecebeAvioes, &dados, 0, NULL);
+
+	// imprimir menu
 
 	do {
 		_tprintf(TEXT("Introduza a opção do comando que pretende executar: \n"));
@@ -85,28 +122,35 @@ int _tmain(int argc, TCHAR* argv[]) {
 		_fgetts(cmd, BUFFER, stdin);
 		int cmdOpt = _tstoi(cmd);
 		switch (cmdOpt) {
-			case 1:
-				if (criaAeroporto(aeroportos, &ptr_memoria->naeroportos, maxae)) {
-					RegistaAeroporto(aeroportos[ptr_memoria->naeroportos-1], chaveAeroportos);
+		case 1:
+			if (criaAeroporto(aeroportos, &dados.ptr_memoria->naeroportos, dados.ptr_memoria->maxavioes)) {
+				RegistaAeroporto(aeroportos[dados.ptr_memoria->naeroportos - 1], chaveAeroportos);
+			}
+			break;
+		case 3:
+			for (int i = 0; i < dados.ptr_memoria->naeroportos; i++) {
+				_tprintf(TEXT("Aeroporto %d: %s, localizado em %d, %d.\n"), i + 1, aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
+			}
+			break;
+		case 4:
+			/*for (int i = 0; i < 50; i++) {
+				for (int j = 0; j < 50; j++) {
+					_tprintf(TEXT("%d"), ptr_memoria->mapa[i][j]);
 				}
-				break;
-			case 3:
-				for (int i = 0; i < ptr_memoria->naeroportos; i++) {
-					_tprintf(TEXT("Aeroporto %d: %s, localizado em %d, %d.\n"), i+1, aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
-				}
-				break;
+				_tprintf(TEXT("\n"));
+			}*/
+			for (int i = 0; i < dados.ptr_memoria->navioes; i++) {
+				_tprintf(TEXT("%d %d\n"), dados.ptr_memoria->avioes[i].x, dados.ptr_memoria->avioes[i].y);
+			}
+			break;
 		}
-
 	} while (_tcsicmp(cmd, TEXT("fim\n")) != 0);
 
-	//hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)LeCmd, NULL, NULL, NULL);
-	//if (hThread == NULL) {
-	//	_tprintf(TEXT("Impossível lançar a thread para ler os comandos do utilizador.\n"));
-	//}
+	// accionar condição de paragem
+	dados.ptr_memoria->terminar = true;
+	WaitForSingleObject(hThread, 0);
 
-	//WaitForSingleObject(hThread, INFINITE);
-
-	// Apagar as chaves dos Aeroportos antes de encerrar.
+	// apagar as chaves dos Aeroportos antes de encerrar.
 
 	result = RegDeleteTree(chaveAeroportos, NULL);
 
