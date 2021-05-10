@@ -9,6 +9,15 @@
 
 #define BUFFER 200
 
+DWORD WINAPI termina(LPVOID param) {
+	TCHAR debug[100];
+	while (1) {
+		_getts_s(debug, 100);
+		break;
+	}
+	return 0;
+}
+
 DWORD WINAPI DeslocaAviao(LPVOID param) {
 	TDados* dados = (TDados*)param;
 
@@ -36,13 +45,12 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 		ReleaseMutex(dados->mutex);
 
 		// assinala semáforo
-		ReleaseSemaphore(dados->sem_avioes, 1, NULL);
+		ReleaseSemaphore(dados->sem_itens, 1, NULL);
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 		_tprintf(TEXT("Aviao na posicao %d %d\n"), dados->self.x, dados->self.y);
 	}
-
 	return 0;
 }
 
@@ -71,11 +79,6 @@ int _tmain(int argc, TCHAR* argv[]) {
 		return -1;
 	}
 
-	// abre os semáforos e o mutex do controlador
-	dados.sem_avioes = OpenSemaphore(SEMAPHORE_MODIFY_STATE, FALSE, SEMAFORO_AVIOES);
-	dados.sem_vazios = OpenSemaphore(SEMAPHORE_MODIFY_STATE, FALSE, SEMAFORO_VAZIOS);
-	dados.mutex = CreateMutex(NULL, FALSE, MUTEX_CONTROL);
-
 	// marca o aeroporto de origem
 	TCHAR aeroportoLocal[BUFFER];
 	_tcscpy_s(aeroportoLocal, BUFFER, argv[1]);
@@ -88,9 +91,18 @@ int _tmain(int argc, TCHAR* argv[]) {
 	}
 	dados.ptr_memoria = (Memoria*)MapViewOfFile(objMap, FILE_MAP_ALL_ACCESS, 0, 0, 0);
 	if (dados.ptr_memoria == NULL) {
-		_tprintf(TEXT("Impossível criar vista de memória partilhada\n"));
+		_tprintf(TEXT("Impossível criar vista de memória partilhada.\n"));
 		return;
 	}
+
+	_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), dados.ptr_memoria->maxaeroportos);
+	_tprintf(TEXT("NUMERO MAXIMO DE AVIOES: %ld\n"), dados.ptr_memoria->maxavioes);
+
+	// abre os semáforos e o mutex do controlador
+	dados.sem_itens = CreateSemaphore(NULL, 0, dados.ptr_memoria->maxavioes, SEMAFORO_ITENS);
+	dados.sem_vazios = CreateSemaphore(NULL, dados.ptr_memoria->maxavioes, dados.ptr_memoria->maxavioes, SEMAFORO_VAZIOS);
+	dados.sem_avioes = CreateSemaphore(NULL, dados.ptr_memoria->maxavioes, dados.ptr_memoria->maxavioes, SEMAFORO_INSTANCIAS);
+	dados.mutex = CreateMutex(NULL, FALSE, MUTEX_CONTROL);
 
 	// abrir chave dos aeroportos
 	RegCreateKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chaveAeroportos, &result);
@@ -124,6 +136,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 	// esperar pelo semáforo das posições vazias e do mutex
+	WaitForSingleObject(dados.sem_avioes, INFINITE);
 	WaitForSingleObject(dados.sem_vazios, INFINITE);
 	WaitForSingleObject(dados.mutex, INFINITE);
 
@@ -135,25 +148,32 @@ int _tmain(int argc, TCHAR* argv[]) {
 	dados.ptr_memoria->saiAviao++; //incrementamos a posicao de escrita para o proximo produtor escrever na posicao seguinte
 
 	// reset do buffer
-	if (dados.ptr_memoria->saiAviao == 200)
+	if (dados.ptr_memoria->saiAviao == dados.ptr_memoria->maxavioes)
 		dados.ptr_memoria->saiAviao = 0;
 
 	// assinalar mutex
 	ReleaseMutex(dados.mutex);
 
-	// assinalar semáforo dos itens vazios
-	ReleaseSemaphore(dados.sem_avioes, 1, NULL);
+	// assinalar semáforo dos itens
+	ReleaseSemaphore(dados.sem_itens, 1, NULL);
 
 	// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 	_tprintf(TEXT("Aviao %d\n"), dados.self.id);
 
+	// lança thread para deslocar o aviao e para terminar o programa
+	HANDLE hThread[2];
+	hThread[0] = CreateThread(NULL, 0, DeslocaAviao, &dados, 0, NULL);
+	hThread[1] = CreateThread(NULL, 0, termina, NULL, 0, NULL);
+	result = WaitForMultipleObjects(2, hThread, FALSE, INFINITE);
+	if (result == WAIT_OBJECT_0) {
+		_tprintf(TEXT("desloca\n"));
+	}
+	else {
+		_tprintf(TEXT("termina\n"));
+	}
 
-	// lança thread para deslocar o aviao
-	HANDLE hThread;
-	hThread = CreateThread(NULL, 0, DeslocaAviao, &dados, 0, NULL);
-	WaitForSingleObject(hThread, INFINITE);
-
+	// assinala semáforo quando termina para dar lugar a outro avião
+	ReleaseSemaphore(dados.sem_avioes, 1, &dados.ptr_memoria->navioes);
 	_tprintf(TEXT("FIM\n"));
-
 }

@@ -1,10 +1,12 @@
 #pragma once
 #include "aeroporto.h"
 #define MEMORIA TEXT("Memoria")
+#define SEMAFORO_CONTROLADOR TEXT("Semáforo de execução do controlador")
+#define SEMAFORO_INSTANCIAS TEXT("Semáforo de execução de aviões")
 #define CHAVE_AEROPORTOS TEXT("SOFTWARE\\temp\\SO2\\Aeroportos")
-#define SEMAFORO_AVIOES TEXT("Semáforo dos aviões")
-#define SEMAFORO_VAZIOS TEXT("Semáforo vazios")
-#define MUTEX_CONTROL TEXT("Mutex do Controlador")
+#define SEMAFORO_ITENS TEXT("Semáforo dos itens")
+#define SEMAFORO_VAZIOS TEXT("Semáforo das posições vazias")
+#define MUTEX_CONTROL TEXT("Mutex do controlador")
 
 typedef struct {
 	DWORD id;
@@ -29,6 +31,7 @@ typedef struct {
 	Memoria* ptr_memoria;
 	HANDLE sem_avioes;
 	HANDLE sem_vazios;
+	HANDLE sem_itens;
 	HANDLE mutex;
 	int id;
 } TDados;

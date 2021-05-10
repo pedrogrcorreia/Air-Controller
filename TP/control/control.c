@@ -17,7 +17,7 @@ DWORD WINAPI RecebeAvioes(LPVOID param) {
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 		// esperar semáforo dos aviões
-		WaitForSingleObject(dados->sem_avioes, INFINITE);
+		WaitForSingleObject(dados->sem_itens, INFINITE);
 
 		// copiar o aviao recebido
 		CopyMemory(&aviao, &dados->ptr_memoria->avioes[dados->ptr_memoria->entAviao], sizeof(Aviao));
@@ -33,7 +33,7 @@ DWORD WINAPI RecebeAvioes(LPVOID param) {
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
-		_tprintf(TEXT("Aviao %d na posicao %d, %d.\n"), aviao.id, aviao.x, aviao.y);
+		//_tprintf(TEXT("Aviao %d na posicao %d, %d.\n"), aviao.id, aviao.x, aviao.y);
 	}
 	return 0;
 }
@@ -59,14 +59,14 @@ int _tmain(int argc, TCHAR* argv[]) {
 #endif
 
 	// verifica se já está alguma instância em execução
-
-	semaforo_execucao = CreateSemaphore(NULL, 0, 1, TEXT("Semáforo Execução"));
+	semaforo_execucao = CreateSemaphore(NULL, 0, 1, SEMAFORO_CONTROLADOR);
 	result = GetLastError();
 	if (result == ERROR_ALREADY_EXISTS) {
 		_tprintf(TEXT("Já existe um controlador em execução.\nPor favor termine-o para iniciar um novo.\n"));
 		return -1;
 	}
 
+	// inicializar a memória
 	objMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(Memoria), MEMORIA);
 	if (objMap == NULL) {
 		return -1;
@@ -78,11 +78,9 @@ int _tmain(int argc, TCHAR* argv[]) {
 	}
 
 	// verifica se a chave abre
-
 	RegOpenKeyEx(HKEY_CURRENT_USER, TEXT("SOFTWARE\\temp\\SO2\\TP"), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, &chaveMAX);
 
 	// obter o numero maximo de aeroportos e avioes
-
 	result = RegQueryValueEx(chaveMAX, TEXT("MAXAE"), NULL, NULL, (LPBYTE)&dados.ptr_memoria->maxaeroportos, (LPDWORD)&cbdata);
 	if (result != ERROR_SUCCESS) {
 		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aeroportos.\nVai ser definido como 10.\n"));
@@ -94,10 +92,15 @@ int _tmain(int argc, TCHAR* argv[]) {
 		dados.ptr_memoria->maxavioes = 10;
 	}
 
-	// inicializa os semáforos, mutex e a condição de paragem
-	dados.sem_avioes = CreateSemaphore(NULL, 0, dados.ptr_memoria->maxavioes, SEMAFORO_AVIOES);
+	// inicializa semáforo para controlar instâncias de aviões
+	dados.sem_avioes = CreateSemaphore(NULL, dados.ptr_memoria->maxavioes, dados.ptr_memoria->maxavioes, SEMAFORO_INSTANCIAS);
+
+	// inicializa os semáforos, mutex para o modelo produtor - consumidor
+	dados.sem_itens = CreateSemaphore(NULL, 0, dados.ptr_memoria->maxavioes, SEMAFORO_ITENS);
 	dados.sem_vazios = CreateSemaphore(NULL, dados.ptr_memoria->maxavioes, dados.ptr_memoria->maxavioes, SEMAFORO_VAZIOS);
 	dados.mutex = CreateMutex(NULL, FALSE, MUTEX_CONTROL);
+
+	// inicializar a condição de paragem a null
 	dados.ptr_memoria->terminar = false;
 
 	// Debug tirar depois
@@ -111,9 +114,12 @@ int _tmain(int argc, TCHAR* argv[]) {
 	aeroportos = malloc(sizeof(Aeroporto) * dados.ptr_memoria->maxavioes);
 	memset(aeroportos, 0, (size_t)dados.ptr_memoria->maxavioes * sizeof(Aeroporto));
 
+	// lança thread para controlar a entrada de aviões
 	hThread = CreateThread(NULL, 0, RecebeAvioes, &dados, 0, NULL);
 
 	// imprimir menu
+
+	bool suspend = false;
 
 	do {
 		_tprintf(TEXT("Introduza a opção do comando que pretende executar: \n"));
@@ -133,16 +139,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 			}
 			break;
 		case 4:
-			/*for (int i = 0; i < 50; i++) {
-				for (int j = 0; j < 50; j++) {
-					_tprintf(TEXT("%d"), ptr_memoria->mapa[i][j]);
-				}
-				_tprintf(TEXT("\n"));
-			}*/
-			for (int i = 0; i < dados.ptr_memoria->navioes; i++) {
-				_tprintf(TEXT("%d %d\n"), dados.ptr_memoria->avioes[i].x, dados.ptr_memoria->avioes[i].y);
-			}
-			break;
+			_tprintf(TEXT("N avioes: %d\n"), dados.ptr_memoria->navioes);
 		}
 	} while (_tcsicmp(cmd, TEXT("fim\n")) != 0);
 
@@ -151,9 +148,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	WaitForSingleObject(hThread, 0);
 
 	// apagar as chaves dos Aeroportos antes de encerrar.
-
-	result = RegDeleteTree(chaveAeroportos, NULL);
-
+	RegDeleteTree(chaveAeroportos, NULL);
 	result = RegDeleteKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, KEY_WOW64_64KEY, 0);
 	if (result == ERROR_SUCCESS) {
 		_tprintf(TEXT("Apaguei a chave dos aeroportos.\n"));
