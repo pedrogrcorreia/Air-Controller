@@ -13,6 +13,8 @@ typedef struct {
 	DWORD id;
 	int x;
 	int y;
+	int velocidade;
+	bool terminar;
 	Aeroporto inicial;
 	Aeroporto destino;
 } Aviao;

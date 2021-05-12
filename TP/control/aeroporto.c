@@ -24,6 +24,11 @@ bool criaAeroporto(Aeroporto* aeroportos, int* numae, int maxae) {
 		return false;
 	}
 
+	if (x < 0 || x>1000 || y < 0 || y>1000) {
+		_tprintf(TEXT("Coordenadas fora do mapa. Tente novamente.\n"));
+		return false;
+	}
+
 	if (!checkCoordenadas(x, y, aeroportos, *numae)) {
 		_tprintf(TEXT("Não pode adicionar um aeroporto nessas coordenadas.\n"));
 		return false;

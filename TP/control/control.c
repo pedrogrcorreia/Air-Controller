@@ -161,7 +161,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 		int cmdOpt = _tstoi(cmd);
 		switch (cmdOpt) {
 		case 1:
-			if (criaAeroporto(aeroportos, &dados.ptr_memoria->naeroportos, dados.ptr_memoria->maxavioes)) {
+			if (criaAeroporto(aeroportos, &dados.ptr_memoria->naeroportos, dados.ptr_memoria->maxaeroportos)) {
 				RegistaAeroporto(aeroportos[dados.ptr_memoria->naeroportos - 1], chaveAeroportos);
 			}
 			break;
