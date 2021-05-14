@@ -11,13 +11,13 @@
 
 void listaAeroportos(Aeroporto aeroportos[], int nae) {
 	for (int i = 0; i < nae; i++) {
-		_tprintf(TEXT("Aeroporto %s, localizado em %d, %d.\n"), aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
+		_tprintf(TEXT("\nAeroporto %s, localizado em %d, %d.\n"), aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
 	}
 }
 
 void listaAvioes(Aviao avioes[], int nav) {
 	for (int i = 0; i < nav; i++) {
-		_tprintf(TEXT("Avião %d na posição %d, %d.\n"), avioes[i].id, avioes[i].x, avioes[i].y);
+		_tprintf(TEXT("\nAvião %d na posição %d, %d.\n"), avioes[i].id, avioes[i].x, avioes[i].y);
 	}
 }
 
@@ -28,12 +28,6 @@ DWORD WINAPI suspend(LPVOID param) {
 	}
 	return 0;
 }
-
-//DWORD WINAPI evento(LPVOID param) {
-//	TDados* dados = (TDados*)param;
-//	WaitForSingleObject(dados->evento, INFINITE);
-//	_tprintf(TEXT("Avião chegou ao aeroporto de destino.\n"));
-//}
 
 DWORD WINAPI RecebeAvioes(LPVOID param) {
 	TDados* dados = (TDados*)param;
@@ -63,7 +57,6 @@ DWORD WINAPI RecebeAvioes(LPVOID param) {
 	}
 	return 0;
 }
-
 
 int _tmain(int argc, TCHAR* argv[]) {
 	Aeroporto* aeroportos;
@@ -109,12 +102,12 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// obter o numero maximo de aeroportos e avioes
 	result = RegQueryValueEx(chaveMAX, TEXT("MAXAE"), NULL, NULL, (LPBYTE)&dados.ptr_memoria->maxaeroportos, (LPDWORD)&cbdata);
 	if (result != ERROR_SUCCESS) {
-		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aeroportos.\nVai ser definido como 10.\n"));
+		_tprintf(TEXT("\nNão foi possível ler do registo o número máximo de aeroportos.\nVai ser definido como 10.\n"));
 		dados.ptr_memoria->maxaeroportos = 10;
 	}
 	result = RegQueryValueEx(chaveMAX, TEXT("MAXAV"), NULL, NULL, (LPBYTE)&dados.ptr_memoria->maxavioes, (LPDWORD)&cbdata);
 	if (result != ERROR_SUCCESS) {
-		_tprintf(TEXT("Não foi possível ler do registo o número máximo de aviões.\nVai ser definido como 20.\n"));
+		_tprintf(TEXT("\nNão foi possível ler do registo o número máximo de aviões.\nVai ser definido como 20.\n"));
 		dados.ptr_memoria->maxavioes = 10;
 	}
 
@@ -154,10 +147,16 @@ int _tmain(int argc, TCHAR* argv[]) {
 	dados.suspend = false;
 
 	do {
-		_tprintf(TEXT("Introduza a opção do comando que pretende executar: \n"));
+		_tprintf(TEXT("\nIntroduza a opção do comando que pretende executar: \n"));
 		_tprintf(TEXT("1. Criar aeroporto\n2. Suspender/Ativar registo de aviões\n3. Listar tudo\n"));
-		_tprintf(TEXT("Opção: "));
+		_tprintf(TEXT("\nOpção: "));
 		_fgetts(cmd, BUFFER, stdin);
+		if (_tcsicmp(cmd, TEXT("\n")) != 0) {
+			cmd[_tcslen(cmd) - 1] = '\0'; // retirar \n
+		}
+		else {
+			continue;
+		}
 		int cmdOpt = _tstoi(cmd);
 		switch (cmdOpt) {
 		case 1:
@@ -170,7 +169,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 			if (!dados.suspend) {
 				susThread = CreateThread(NULL, 0, suspend, &dados, 0, NULL);
 				dados.suspend = true;
-				_tprintf(TEXT("Registo de aviões suspensos.\n"));
+				_tprintf(TEXT("\nRegisto de aviões suspensos.\n"));
 			}
 			else {
 				int release = 0;
@@ -182,7 +181,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 				}
 				ReleaseSemaphore(dados.sem_avioes, release, NULL);
 				dados.suspend = false;
-				_tprintf(TEXT("Registo de aviões ativo.\n"));
+				_tprintf(TEXT("\nRegisto de aviões ativo.\n"));
 			}
 			break;
 		case 3:
@@ -190,9 +189,12 @@ int _tmain(int argc, TCHAR* argv[]) {
 			listaAvioes(dados.ptr_memoria->avioes, dados.ptr_memoria->navioes);
 			break;
 		case 4:
-			_tprintf(TEXT("N avioes: %d\n"), dados.ptr_memoria->navioes);
+			//for (int i = 0; i < dados.ptr_memoria->maxavioes; i++) {
+			//	_tprintf(TEXT("Avião %d na posição %d, %d.\n"), dados.ptr_memoria->avioes[i].id, dados.ptr_memoria->avioes[i].x, dados.ptr_memoria->avioes[i].y);
+			//}
+			_tprintf(TEXT("%d %d %d"), dados.ptr_memoria->avioes[0].id, dados.ptr_memoria->avioes[0].x, dados.ptr_memoria->avioes[0].y);
 		}
-	} while (_tcsicmp(cmd, TEXT("fim\n")) != 0);
+	} while (_tcsicmp(cmd, TEXT("fim")) != 0);
 
 	// accionar condição de paragem
 	dados.ptr_memoria->terminar = true;

@@ -38,6 +38,7 @@ typedef struct {
 	HANDLE sem_vazios; // posições vazios do modelo produtor - consumidor
 	HANDLE sem_itens; // itens do modelo produtor - consumidor
 	HANDLE mutex; // mutex para o modelo produtor - consumidor
+	HKEY chaveAeroportos;
 	bool suspend;
 	int id;
 } TDados;
