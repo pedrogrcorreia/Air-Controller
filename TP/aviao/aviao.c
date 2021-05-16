@@ -13,10 +13,12 @@
 bool getAeroportoInicial(TDados* dados, HKEY chaveAeroportos) {
 	HKEY chaveLocal;
 	DWORD result, cbdata = sizeof(int);
+
 	// abrir chave do aeroporto inicial, caso não exista encerrar
 	RegCreateKeyEx(chaveAeroportos, dados->self.inicial.nome, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chaveLocal, &result);
 	if (result == REG_CREATED_NEW_KEY) {
 		_tprintf(TEXT("Não existe nenhum aeroporto com esse nome.\n"));
+		RegDeleteKey(chaveAeroportos, dados->self.inicial.nome);
 		return false;
 	}
 
@@ -44,6 +46,7 @@ bool getAeroportoDestino(TDados** dados, HKEY chaveAeroportos) {
 	RegCreateKeyEx((*dados)->chaveAeroportos, (*dados)->self.destino.nome, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chaveLocal, &result);
 	if (result == REG_CREATED_NEW_KEY) {
 		_tprintf(TEXT("Não existe nenhum aeroporto com esse nome.\n"));
+		RegDeleteKey(chaveAeroportos, (*dados)->self.destino.nome);
 		return false;
 	}
 
@@ -67,7 +70,7 @@ DWORD WINAPI stop(LPVOID param) {
 	while (!(*dados)->self.terminar) {
 		_fgetts(buffer, BUFFER, stdin);
 		if (_tcsicmp(TEXT("fim\n"), buffer) == 0) {
-			(*dados)->self.terminar = true;
+			(*dados)->self.terminar = true; // parar uma viagem
 		}
 	}
 	return 0;
@@ -82,6 +85,7 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 
 		move((*dados)->self.x, (*dados)->self.y, (*dados)->self.destino.x, (*dados)->self.destino.y, &(*dados)->self.x, &(*dados)->self.y);
 
+		// desviar avião -> não funciona sem a implementação abaixo
 		for (int i = 0; i < (*dados)->ptr_memoria->navioes; i++) {
 			if ((*dados)->self.x == (*dados)->ptr_memoria->avioes[i].x && (*dados)->self.y == (*dados)->ptr_memoria->avioes[i].y) {
 				(*dados)->self.x--;
@@ -90,34 +94,37 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
+		/*
 		// esperar semáforo vazio e o mutex
-		//WaitForSingleObject((*dados)->sem_vazios, INFINITE);
-		//WaitForSingleObject((*dados)->mutex, INFINITE);
+		WaitForSingleObject((*dados)->sem_vazios, INFINITE);
+		WaitForSingleObject((*dados)->mutex, INFINITE);
 
-		//// copiar o avião
-		//CopyMemory(&(*dados)->ptr_memoria->avioes[(*dados)->ptr_memoria->saiAviao], &(*dados)->self, sizeof(Aviao));
-		//(*dados)->ptr_memoria->saiAviao++;
+		// copiar o avião
+		CopyMemory(&(*dados)->ptr_memoria->avioes[(*dados)->ptr_memoria->saiAviao], &(*dados)->self, sizeof(Aviao));
+		(*dados)->ptr_memoria->saiAviao++;
 
-		//// reset buffer
-		//if ((*dados)->ptr_memoria->saiAviao == (*dados)->ptr_memoria->maxavioes) {
-		//	(*dados)->ptr_memoria->saiAviao = 0;
-		//}
+		// reset buffer
+		if ((*dados)->ptr_memoria->saiAviao == (*dados)->ptr_memoria->maxavioes) {
+			(*dados)->ptr_memoria->saiAviao = (*dados)->ptr_memoria->maxavioes;
+		}
 
-		//// assinalar mutex
-		//ReleaseMutex((*dados)->mutex);
+		// assinalar mutex
+		ReleaseMutex((*dados)->mutex);
 
-		//// assinala semáforo
-		//ReleaseSemaphore((*dados)->sem_itens, 1, NULL);
+		// assinala semáforo
+		ReleaseSemaphore((*dados)->sem_itens, 1, NULL);
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
+		*/
 
-
+		// imprimir a posicao atual do aviao
 		_tprintf(TEXT("Aviao na posicao %d %d\n"), (*dados)->self.x, (*dados)->self.y);
 
 		// parar quando chega ao aeroporto
 		if ( (*dados)->self.x == (*dados)->self.destino.x && ( (*dados)->self.y == (*dados)->self.destino.y ) ) {
 			(*dados)->self.inicial = (*dados)->self.destino;
 			(*dados)->self.terminar = true;
+			SetEvent((*dados)->self.eventos[1]);
 			_tprintf(TEXT("O avião chegou ao aeroporto de destino.\n"));
 			_tprintf(TEXT("Enter para continuar.\n")); // sair da thread stop
 			break;
@@ -134,8 +141,7 @@ DWORD WINAPI leComandos(LPVOID param) {
 	TCHAR* nextToken = NULL;
 	TCHAR* comando = NULL;
 	DWORD result;
-	bool acidente = false; // controlo de terminação do programa
-	bool destino = false;
+	bool destino = false; // controlo da existência de um destino definido
 
 	do {
 		_tprintf(TEXT("\nO avião encontra-se no aeroporto %s localizado em %d, %d.\n"), dados->self.inicial.nome, dados->self.inicial.x, dados->self.inicial.y);
@@ -155,7 +161,7 @@ DWORD WINAPI leComandos(LPVOID param) {
 				if (token != 0) { // se o token for != 0 copia para o aeroporto de destino
 					_tcscpy_s(dados->self.destino.nome, BUFFER, token);
 					if (getAeroportoDestino(&dados, dados->chaveAeroportos)) {
-						destino = true;
+						destino = true; // impedir outro destino
 						_tprintf(TEXT("\nAeroporto destino definido como %s localizado em %d, %d.\n"), dados->self.destino.nome, dados->self.destino.x, dados->self.destino.y);
 					}
 				}
@@ -168,7 +174,7 @@ DWORD WINAPI leComandos(LPVOID param) {
 			}
 		}
 		if (_tcsicmp(comando, TEXT("inicia")) == 0) {
-			if (destino) {
+			if (destino) { // apenas inicia se já tiver sido dado um destino
 				token = _tcstok_s(NULL, delim, &nextToken);
 				if (token == 0) {
 					dados->self.terminar = false; // reset da condição de paragem
@@ -176,6 +182,9 @@ DWORD WINAPI leComandos(LPVOID param) {
 					HANDLE hThread[2];
 					hThread[0] = CreateThread(NULL, 0, DeslocaAviao, &dados, 0, NULL); // cria thread para movimentar os avioes
 					hThread[1] = CreateThread(NULL, 0, stop, &dados, 0, NULL);  // cria thread para parar o programa
+					if (hThread[1] == NULL) {
+						return -1;
+					}
 					result = WaitForMultipleObjects(2, hThread, FALSE, INFINITE); // espera por ambos
 					if (result == WAIT_OBJECT_0) {								// caso acabe a viagem espera pelo enter do utilizador
 						WaitForSingleObject(hThread[1], INFINITE);
@@ -183,7 +192,6 @@ DWORD WINAPI leComandos(LPVOID param) {
 					}
 					if (result == WAIT_OBJECT_0 + 1) {							// caso contrário sai termina
 						_tprintf(TEXT("\nViagem interrompida em voo, o avião despenhou-se.\n"));
-						acidente = true;
 						break;
 					}
 					destino = false;
@@ -204,16 +212,22 @@ DWORD WINAPI leComandos(LPVOID param) {
 DWORD WINAPI terminar(LPVOID param) {
 	TDados* dados = (TDados*)param;
 	while (!dados->ptr_memoria->terminar) {
-		continue;
+		continue; // enquanto o controlador nao terminar
 	}
 	return 0;
+}
+
+DWORD WINAPI AlertaControl(LPVOID param) {
+	TDados* dados = (TDados*)param;
+	while (1) {
+		SetEvent(dados->self.eventos[0]); // Assinalar evento para o controlador
+	}
 }
 
 int _tmain(int argc, TCHAR* argv[]) {
 	HANDLE objMap, sem_control;
 	DWORD result, cbdata = sizeof(int);
 	TDados dados;
-	TCHAR cmd[BUFFER];
 #ifdef UNICODE 
 	if (_setmode(_fileno(stdin), _O_WTEXT) == -1) {
 		perror("Impossivel user _setmode()");
@@ -275,9 +289,32 @@ int _tmain(int argc, TCHAR* argv[]) {
 		return -1;
 	}
 
+
+	// obter aeroporto inicial
 	if (getAeroportoInicial(&dados, dados.chaveAeroportos)) {
 		_tprintf(TEXT("Aeroporto inicial definido em %s localizado em %d, %d.\n"), dados.self.inicial.nome, dados.self.inicial.x, dados.self.inicial.y);
 	}
+	else {
+		return -1;
+	}
+
+
+	TCHAR alerta[BUFFER];
+	TCHAR chegada[BUFFER];
+
+	// criar evento para alerta
+	_stprintf_s(alerta, BUFFER, TEXT("alerta %d"), dados.self.id);
+	dados.self.eventos[0] = CreateEvent(NULL, FALSE, FALSE, alerta);
+
+
+	// criar evento para chegadas
+	_stprintf_s(chegada, BUFFER, TEXT("chegada %d"), dados.self.id);
+	dados.self.eventos[1] = CreateEvent(NULL, FALSE, FALSE, chegada);
+
+
+	// criar thread para enviar alertas enquanto o programa nao terminar
+	HANDLE hAlerta;
+	hAlerta = CreateThread(NULL, 0, AlertaControl, &dados, 0, NULL);
 
 	// esperar pelo semáforo das instâncias do avião
 	WaitForSingleObject(dados.sem_avioes, INFINITE);
@@ -298,7 +335,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 	// reset do buffer
 	if (dados.ptr_memoria->saiAviao == dados.ptr_memoria->maxavioes)
-		dados.ptr_memoria->saiAviao = 0;
+		dados.ptr_memoria->saiAviao = dados.ptr_memoria->maxavioes;
 
 	// assinalar mutex
 	ReleaseMutex(dados.mutex);
@@ -309,22 +346,27 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 	// DEBUG
-	_tprintf(TEXT("Aviao %d %d %d\n"), dados.self.id, dados.self.x, dados.self.y);
+	_tprintf(TEXT("Aviao id %d: %d, %d\n"), dados.self.id, dados.self.x, dados.self.y);
 
-	// lança a thread para ler os comandos e a thread para terminar.
+	// lança a thread para ler os comandos e a thread para terminar
 	HANDLE hThread[2];
-	hThread[0] = CreateThread(NULL, 0, leComandos, &dados, 0, NULL);
+	hThread[0] = CreateThread(NULL, 0, leComandos, &dados, 0, NULL); 
 	hThread[1] = CreateThread(NULL, 0, terminar, &dados, 0, NULL);
-	result = WaitForMultipleObjects(2, hThread, FALSE, INFINITE);
+	result = WaitForMultipleObjects(2, hThread, FALSE, INFINITE); // apenas 1 necessita de acabar
 	if (result == WAIT_OBJECT_0 + 1) {
 		_tprintf(TEXT("O controlador terminou.\n"));
 	}
 
 	// retira o avião
 	WaitForSingleObject(dados.mutex, INFINITE);
+	dados.ptr_memoria->saiAviao--;
 	dados.ptr_memoria->navioes--;
 	ReleaseMutex(dados.mutex);
 
 	// assinala semáforo quando termina para dar lugar a outro avião
 	ReleaseSemaphore(dados.sem_avioes, 1, NULL);
+
+	UnmapViewOfFile(dados.ptr_memoria);
+	
+	return 0;
 }

@@ -17,6 +17,7 @@ void listaAeroportos(Aeroporto aeroportos[], int nae) {
 
 void listaAvioes(Aviao avioes[], int nav) {
 	for (int i = 0; i < nav; i++) {
+		_tprintf(TEXT("\t %d"), nav);
 		_tprintf(TEXT("\nAvião %d na posição %d, %d.\n"), avioes[i].id, avioes[i].x, avioes[i].y);
 	}
 }
@@ -32,7 +33,6 @@ DWORD WINAPI suspend(LPVOID param) {
 DWORD WINAPI RecebeAvioes(LPVOID param) {
 	TDados* dados = (TDados*)param;
 	Aviao aviao;
-	DWORD result;
 	while (!dados->ptr_memoria->terminar) {
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
@@ -42,10 +42,10 @@ DWORD WINAPI RecebeAvioes(LPVOID param) {
 		// copiar o aviao recebido
 		CopyMemory(&aviao, &dados->ptr_memoria->avioes[dados->ptr_memoria->entAviao], sizeof(Aviao));
 		dados->ptr_memoria->entAviao++; 
-
-		// reset do buffer
+		 
+		// reset do buffer não é necessário
 		if (dados->ptr_memoria->entAviao == dados->ptr_memoria->maxavioes) {
-			dados->ptr_memoria->entAviao = 0;
+			dados->ptr_memoria->entAviao = dados->ptr_memoria->maxavioes;
 		}
 
 		// assinala semáforo
@@ -54,6 +54,63 @@ DWORD WINAPI RecebeAvioes(LPVOID param) {
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 		//_tprintf(TEXT("Aviao %d na posicao %d, %d.\n"), aviao.id, aviao.x, aviao.y);
+	}
+	return 0;
+}
+
+DWORD WINAPI RecebeAlerta(LPVOID param) {
+	TDados* dados = (TDados*)param;
+	DWORD result;
+	TCHAR alerta[BUFFER];
+	while (!dados->ptr_memoria->terminar) {
+		if (dados->ptr_memoria->entAviao > 0) {
+			for (int i = 0; i < dados->ptr_memoria->entAviao; i++) {
+				_stprintf_s(alerta, BUFFER, TEXT("alerta %d"), dados->ptr_memoria->avioes[i].id); // criar evento com o id do aviao
+				dados->ptr_memoria->avioes[i].eventos[0] = OpenEvent(EVENT_ALL_ACCESS, TRUE, alerta); // abrir o evento
+				if (dados->ptr_memoria->avioes[i].eventos[0] == NULL) {
+					_tprintf(TEXT("Erro não abri o evento.\n"));
+					_tprintf(TEXT("O controlador não vai funcionar normalmente, por favor reinicie.\n"));
+					return -1;
+				}
+			}
+			for (int i = 0; i < dados->ptr_memoria->entAviao; i++) {
+				result = WaitForSingleObject(dados->ptr_memoria->avioes[i].eventos[0], 100); // esperar pelos eventos de cada avião
+				if (result == WAIT_TIMEOUT) {
+					_tprintf(TEXT("Avião %d desligou-se.\n"), dados->ptr_memoria->avioes[i].id); // se não chegar é porque o avião se desligou
+					WaitForSingleObject(dados->mutex, INFINITE);
+					dados->ptr_memoria->avioes[i] = dados->ptr_memoria->avioes[i+1]; // retira o avião
+					dados->ptr_memoria->entAviao--;
+					ReleaseMutex(dados->mutex);
+				}
+			}
+		}
+		Sleep(3000);
+	}
+	return 0;
+}
+
+DWORD WINAPI RecebeChegada(LPVOID param) {
+	TDados* dados = (TDados*)param;
+	DWORD result;
+	TCHAR chegada[BUFFER];
+	while (!dados->ptr_memoria->terminar) {
+		if (dados->ptr_memoria->entAviao > 0) {
+			for (int i = 0; i < dados->ptr_memoria->entAviao; i++) {
+				_stprintf_s(chegada, BUFFER, TEXT("chegada %d"), dados->ptr_memoria->avioes[i].id); // criar evento com o id do avião
+				dados->ptr_memoria->avioes[i].eventos[1] = OpenEvent(EVENT_ALL_ACCESS, TRUE, chegada); // abrir o evento
+				if (dados->ptr_memoria->avioes[i].eventos[1] == NULL) {
+					_tprintf(TEXT("Erro não abri o evento.\n"));
+					_tprintf(TEXT("O controlador não vai funcionar normalmente, por favor reinicie.\n"));
+					return -1;
+				}
+			}
+			for (int i = 0; i < dados->ptr_memoria->entAviao; i++) {
+				result = WaitForSingleObject(dados->ptr_memoria->avioes[i].eventos[1], 100); // esperar pelas chegadas de cada avião
+				if (result == WAIT_OBJECT_0) {
+					_tprintf(TEXT("Avião %d chegou ao destino.\n"), dados->ptr_memoria->avioes[i].id); // mostrar a mensagem
+				}
+			}
+		}
 	}
 	return 0;
 }
@@ -118,18 +175,17 @@ int _tmain(int argc, TCHAR* argv[]) {
 	dados.sem_itens = CreateSemaphore(NULL, 0, dados.ptr_memoria->maxavioes, SEMAFORO_ITENS);
 	dados.sem_vazios = CreateSemaphore(NULL, dados.ptr_memoria->maxavioes, dados.ptr_memoria->maxavioes, SEMAFORO_VAZIOS);
 	dados.mutex = CreateMutex(NULL, FALSE, MUTEX_CONTROL);
-	//dados.evento = CreateEvent(NULL, FALSE, FALSE, EVENTO);
 
 	// inicializar a condição de paragem a null
 	dados.ptr_memoria->terminar = false;
 	dados.ptr_memoria->navioes = 0;
 	dados.ptr_memoria->naeroportos = 0;
 
-	// Debug tirar depois
-	_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), dados.ptr_memoria->maxaeroportos);
-	_tprintf(TEXT("NUMERO MAXIMO DE AVIOES: %ld\n"), dados.ptr_memoria->maxavioes);
-	_tprintf(TEXT("NUMERO DE AEROPORTOS: %ld\n"), dados.ptr_memoria->naeroportos);
-	_tprintf(TEXT("NUMERO DE AVIOES: %ld\n"), dados.ptr_memoria->navioes);
+	// DEBUG
+	//_tprintf(TEXT("NUMERO MAXIMO DE AEROPORTOS: %ld\n"), dados.ptr_memoria->maxaeroportos);
+	//_tprintf(TEXT("NUMERO MAXIMO DE AVIOES: %ld\n"), dados.ptr_memoria->maxavioes);
+	//_tprintf(TEXT("NUMERO DE AEROPORTOS: %ld\n"), dados.ptr_memoria->naeroportos);
+	//_tprintf(TEXT("NUMERO DE AVIOES: %ld\n"), dados.ptr_memoria->navioes);
 
 	// registar ou abrir chave para registo de aeroportos
 	RegCreateKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chaveAeroportos, NULL);
@@ -141,11 +197,18 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// lança thread para controlar a entrada de aviões
 	hThread = CreateThread(NULL, 0, RecebeAvioes, &dados, 0, NULL);
 
-	/*HANDLE hThreadd = CreateThread(NULL, 0, evento, &dados, 0, NULL);*/
-	// imprimir menu
+	// inicializa a thread para receber alertas
+	HANDLE hAlerta;
+	hAlerta = CreateThread(NULL, 0, RecebeAlerta, &dados, 0, NULL);
 
+	// inicializa a thread para receber alertas de chegadas
+	HANDLE hChegada;
+	hChegada = CreateThread(NULL, 0, RecebeChegada, &dados, 0, NULL);
+
+	// inicializa suspensao de dados como falso
 	dados.suspend = false;
 
+	// imprimir menu
 	do {
 		_tprintf(TEXT("\nIntroduza a opção do comando que pretende executar: \n"));
 		_tprintf(TEXT("1. Criar aeroporto\n2. Suspender/Ativar registo de aviões\n3. Listar tudo\n"));
@@ -167,17 +230,17 @@ int _tmain(int argc, TCHAR* argv[]) {
 		case 2:
 			HANDLE susThread; 
 			if (!dados.suspend) {
-				susThread = CreateThread(NULL, 0, suspend, &dados, 0, NULL);
+				susThread = CreateThread(NULL, 0, suspend, &dados, 0, NULL); // thread para ocupar todas as posições do semáforo
 				dados.suspend = true;
 				_tprintf(TEXT("\nRegisto de aviões suspensos.\n"));
 			}
 			else {
 				int release = 0;
 				if (dados.ptr_memoria->maxavioes - dados.ptr_memoria->navioes < 0) {
-					release = 0;
+					release = 0; // se todas as posições tiverem ocupadas antes da suspensão 
 				}
 				else {
-					release = dados.ptr_memoria->maxavioes - dados.ptr_memoria->navioes;
+					release = dados.ptr_memoria->maxavioes - dados.ptr_memoria->navioes; // numero de posições a libertar
 				}
 				ReleaseSemaphore(dados.sem_avioes, release, NULL);
 				dados.suspend = false;
@@ -186,13 +249,8 @@ int _tmain(int argc, TCHAR* argv[]) {
 			break;
 		case 3:
 			listaAeroportos(aeroportos, dados.ptr_memoria->naeroportos);
-			listaAvioes(dados.ptr_memoria->avioes, dados.ptr_memoria->navioes);
+			listaAvioes(dados.ptr_memoria->avioes, dados.ptr_memoria->entAviao);
 			break;
-		case 4:
-			//for (int i = 0; i < dados.ptr_memoria->maxavioes; i++) {
-			//	_tprintf(TEXT("Avião %d na posição %d, %d.\n"), dados.ptr_memoria->avioes[i].id, dados.ptr_memoria->avioes[i].x, dados.ptr_memoria->avioes[i].y);
-			//}
-			_tprintf(TEXT("%d %d %d"), dados.ptr_memoria->avioes[0].id, dados.ptr_memoria->avioes[0].x, dados.ptr_memoria->avioes[0].y);
 		}
 	} while (_tcsicmp(cmd, TEXT("fim")) != 0);
 
@@ -203,9 +261,13 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// apagar as chaves dos Aeroportos antes de encerrar.
 	RegDeleteTree(chaveAeroportos, NULL);
 	result = RegDeleteKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, KEY_WOW64_64KEY, 0);
-	if (result == ERROR_SUCCESS) {
-		_tprintf(TEXT("Apaguei a chave dos aeroportos.\n"));
-	}
+
+	// DEBUG
+	//if (result == ERROR_SUCCESS) {
+	//	_tprintf(TEXT("Apaguei a chave dos aeroportos.\n"));
+	//}
+
+	UnmapViewOfFile(dados.ptr_memoria);
 
 	return 0;
 	

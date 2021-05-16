@@ -1,13 +1,13 @@
 #pragma once
 #include "aeroporto.h"
-#define MEMORIA TEXT("Memoria")
+#define MEMORIA TEXT("Memoria partilhada")
 #define SEMAFORO_CONTROLADOR TEXT("Semáforo de execução do controlador")
 #define SEMAFORO_INSTANCIAS TEXT("Semáforo de execução de aviões")
 #define CHAVE_AEROPORTOS TEXT("SOFTWARE\\temp\\SO2\\Aeroportos")
 #define SEMAFORO_ITENS TEXT("Semáforo dos itens")
 #define SEMAFORO_VAZIOS TEXT("Semáforo das posições vazias")
 #define MUTEX_CONTROL TEXT("Mutex do controlador")
-#define EVENTO TEXT("Evento para chegada")
+#define TAM 100
 
 typedef struct {
 	DWORD id;
@@ -17,10 +17,10 @@ typedef struct {
 	bool terminar;
 	Aeroporto inicial;
 	Aeroporto destino;
+	HANDLE eventos[2]; // 0 -> alerta // 1 -> chegada aeroporto
 } Aviao;
 
 typedef struct {
-	int mapa[1000][1000];
 	int maxaeroportos;
 	int maxavioes;
 	int naeroportos;
@@ -28,7 +28,7 @@ typedef struct {
 	int entAviao; // controlo do modelo produtor - consumidor
 	int saiAviao; // controlo do modelo produtor - consumidor
 	bool terminar; // condição de paragem do programa
-	Aviao avioes[]; // array de avioes, onde vao ser colocados os "itens" do modelo produtor - consumidor
+	Aviao avioes[TAM]; // array de avioes, onde vao ser colocados os "itens" do modelo produtor - consumidor
 } Memoria;
 
 typedef struct {
@@ -40,5 +40,4 @@ typedef struct {
 	HANDLE mutex; // mutex para o modelo produtor - consumidor
 	HKEY chaveAeroportos;
 	bool suspend;
-	int id;
 } TDados;
