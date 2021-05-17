@@ -17,7 +17,6 @@ void listaAeroportos(Aeroporto aeroportos[], int nae) {
 
 void listaAvioes(Aviao avioes[], int nav) {
 	for (int i = 0; i < nav; i++) {
-		_tprintf(TEXT("\t %d"), nav);
 		_tprintf(TEXT("\nAvião %d na posição %d, %d.\n"), avioes[i].id, avioes[i].x, avioes[i].y);
 	}
 }
