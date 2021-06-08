@@ -93,6 +93,7 @@ Aeroporto getAeroporto(TCHAR nome[], Aeroporto* aeroportos, int numae) {
 			return aeroportos[i];
 		}
 	}
+	return;
 }
 
 int getX(TCHAR nome[], Aeroporto* aeroportos, int numae) {
@@ -100,8 +101,8 @@ int getX(TCHAR nome[], Aeroporto* aeroportos, int numae) {
 		if (_tcsicmp(aeroportos[i].nome, nome) == 0) {
 			return aeroportos[i].x;
 		}
-		return -1;
 	}
+	return -1;
 }
 
 int getY(TCHAR nome[], Aeroporto* aeroportos, int numae) {
@@ -109,6 +110,6 @@ int getY(TCHAR nome[], Aeroporto* aeroportos, int numae) {
 		if (_tcsicmp(aeroportos[i].nome, nome) == 0) {
 			return aeroportos[i].y;
 		}
-		return -1;
 	}
+	return -1;
 }

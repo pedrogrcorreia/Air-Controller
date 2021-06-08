@@ -124,7 +124,6 @@ DWORD WINAPI RecebeAvioes(LPVOID param) {
 DWORD WINAPI RecebeAlerta(LPVOID param) {
 	TDados* dados = (TDados*)param;
 	DWORD result;
-	TCHAR alerta[BUFFER];
 	while (!dados->ptr_memoria->terminar) {
 		if (dados->ptr_memoria->navioes > 0) {
 			for (int i = 0; i < dados->ptr_memoria->navioes; i++) {
@@ -295,7 +294,9 @@ int _tmain(int argc, TCHAR* argv[]) {
 	} while (_tcsicmp(cmd, TEXT("fim")) != 0);
 
 	// accionar condição de paragem
+	//WaitForSingleObject(dados.mutex, INFINITE);
 	dados.ptr_memoria->terminar = true;
+	//ReleaseMutex(dados.mutex);
 	WaitForSingleObject(hThread, 0);
 
 	UnmapViewOfFile(dados.ptr_memoria);

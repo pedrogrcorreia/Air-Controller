@@ -224,8 +224,6 @@ DWORD WINAPI leComandos(LPVOID param) {
 
 DWORD WINAPI terminar(LPVOID param) {
 	TDados* dados = (TDados*)param;
-	//dados->self = getAviao(dados->self, *dados);
-	//_tprintf(TEXT("%d %d"), dados->ptr_memoria->terminar, dados->ptr_memoria->avioes[dados->self.pos].terminar);
 	while (!dados->ptr_memoria->terminar) {
 		continue; // enquanto o controlador nao terminar
 	}
@@ -234,9 +232,8 @@ DWORD WINAPI terminar(LPVOID param) {
 
 DWORD WINAPI terminarAviao(LPVOID param) {
 	TDados* dados = (TDados*)param;
-	dados->self = getAviao(dados->self, *dados);
 	while (!dados->self.terminar) {
-		//_tprintf(TEXT("%d"), dados->ptr_memoria->avioes[dados->self.pos].terminar);
+		dados->self = getAviao(dados->self, *dados);
 		continue; // se o controlador terminar o aviao
 	}
 	return 0;
