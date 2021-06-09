@@ -11,15 +11,15 @@
 #define BUFFER 200
 
 Aviao getAviao(Aviao a, TDados dados) {
-	//WaitForSingleObject(dados.mutex, INFINITE);
+	WaitForSingleObject(dados.mutex, INFINITE);
 	for (int i = 0; i <= dados.ptr_memoria->navioes; i++) {
 		if (a.id == dados.ptr_memoria->avioes[i].id) {
-		//	ReleaseMutex(dados.mutex);
+			ReleaseMutex(dados.mutex);
 			return dados.ptr_memoria->avioes[i];
 		}
 	}
-	//ReleaseMutex(dados.mutex);
-	//return;
+	ReleaseMutex(dados.mutex);
+	return;
 }
 
 DWORD WINAPI stop(LPVOID param) {
@@ -36,7 +36,7 @@ DWORD WINAPI stop(LPVOID param) {
 
 DWORD WINAPI DeslocaAviao(LPVOID param) {
 	TDados** dados = (TDados**)param;
-
+	
 	while (!(*dados)->ptr_memoria->terminar && !(*dados)->self.terminar) {
 		(*dados)->self = getAviao((*dados)->self, **dados);
 		(*dados)->self.setDestino = false;
@@ -48,7 +48,7 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 
 		// desviar
 		for (int i = 0; i < (*dados)->ptr_memoria->navioes; i++) {
-			if ((*dados)->self.x == (*dados)->ptr_memoria->avioes[i].x && (*dados)->self.y == (*dados)->ptr_memoria->avioes[i].y && (*dados)->self.x != (*dados)->self.destino.x) {
+			if ((*dados)->self.x == (*dados)->ptr_memoria->avioes[i].x && (*dados)->self.y == (*dados)->ptr_memoria->avioes[i].y && (*dados)->self.x != (*dados)->self.destino.x ) {
 				(*dados)->self.x--;
 				(*dados)->self.y--;
 			}
@@ -56,7 +56,7 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR inicio
 
-
+		
 		// esperar semáforo vazio e o mutex
 		WaitForSingleObject((*dados)->sem_vazios, INFINITE);
 		WaitForSingleObject((*dados)->mutex, INFINITE);
@@ -72,13 +72,13 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 		ReleaseSemaphore((*dados)->sem_itens, 1, NULL);
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR fim
-
+		
 
 		// imprimir a posicao atual do aviao
 		_tprintf(TEXT("Aviao na posicao %d %d\n"), (*dados)->self.x, (*dados)->self.y);
 
 		// parar quando chega ao aeroporto
-		if ((*dados)->self.x == (*dados)->self.destino.x && ((*dados)->self.y == (*dados)->self.destino.y)) {
+		if ((*dados)->self.x == (*dados)->self.destino.x && ((*dados)->self.y == (*dados)->self.destino.y) ) {
 			(*dados)->self.terminarViagem = true;
 			(*dados)->self.viajar = false;
 
@@ -159,7 +159,7 @@ DWORD WINAPI leComandos(LPVOID param) {
 					// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR final
 
 					HANDLE setDestino;
-					setDestino = CreateEvent(NULL, FALSE, FALSE, EVENTO_COMANDOS);
+					setDestino = CreateEvent(NULL, FALSE, FALSE, EVENTO_COMANDOS); 
 					if (setDestino == NULL) {
 						return -1;
 					}
@@ -224,6 +224,8 @@ DWORD WINAPI leComandos(LPVOID param) {
 
 DWORD WINAPI terminar(LPVOID param) {
 	TDados* dados = (TDados*)param;
+	//dados->self = getAviao(dados->self, *dados);
+	//_tprintf(TEXT("%d %d"), dados->ptr_memoria->terminar, dados->ptr_memoria->avioes[dados->self.pos].terminar);
 	while (!dados->ptr_memoria->terminar) {
 		continue; // enquanto o controlador nao terminar
 	}
@@ -234,6 +236,7 @@ DWORD WINAPI terminarAviao(LPVOID param) {
 	TDados* dados = (TDados*)param;
 	dados->self = getAviao(dados->self, *dados);
 	while (!dados->self.terminar) {
+		//_tprintf(TEXT("%d"), dados->ptr_memoria->avioes[dados->self.pos].terminar);
 		continue; // se o controlador terminar o aviao
 	}
 	return 0;
@@ -358,7 +361,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 	// lança a thread para ler os comandos e a thread para terminar
 	HANDLE hThread[3];
-	hThread[0] = CreateThread(NULL, 0, leComandos, &dados, 0, NULL);
+	hThread[0] = CreateThread(NULL, 0, leComandos, &dados, 0, NULL); 
 	hThread[1] = CreateThread(NULL, 0, terminar, &dados, 0, NULL);
 	hThread[2] = CreateThread(NULL, 0, terminarAviao, &dados, 0, NULL);
 	result = WaitForMultipleObjects(3, hThread, FALSE, INFINITE); // apenas 1 necessita de acabar
@@ -368,11 +371,9 @@ int _tmain(int argc, TCHAR* argv[]) {
 	if (result == WAIT_OBJECT_0 + 2) {
 		_tprintf(TEXT("O controlador terminou este aviao.\n"));
 	}
-	
-	//ReleaseSemaphore(dados.sem_itens, 1, NULL);
-	
+
 	UnmapViewOfFile(dados.ptr_memoria);
 	UnmapViewOfFile(dados.ptr_modelo);
-
+	
 	return 0;
 }
