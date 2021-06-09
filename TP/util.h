@@ -51,5 +51,6 @@ typedef struct {
 	HANDLE sem_avioes;
 	Aeroporto* aeroportos;
 	bool suspend;
+	HWND hWnd;
 	HANDLE eventos[];
 } TDados;
