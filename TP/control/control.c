@@ -10,19 +10,14 @@
 #define BUFFER 200
 
 void listaAeroportos(Aeroporto aeroportos[], int nae) {
-	_tprintf(TEXT("\nExistem %d aeroportos.\n"), nae);
 	for (int i = 0; i < nae; i++) {
 		_tprintf(TEXT("\nAeroporto %s, localizado em %d, %d.\n"), aeroportos[i].nome, aeroportos[i].x, aeroportos[i].y);
 	}
 }
 
 void listaAvioes(Aviao avioes[], int nav) {
-	_tprintf(TEXT("\nExistem %d aviões.\n"), nav);
 	for (int i = 0; i < nav; i++) {
 		_tprintf(TEXT("\nAvião %d na posição %d, %d.\n"), avioes[i].id, avioes[i].x, avioes[i].y);
-		if (avioes[i].setDestino) {
-			_tprintf(TEXT("\nAvião %d com destino a %s em %d %d.\n"), avioes[i].id, avioes[i].destino.nome, avioes[i].destino.x, avioes[i].destino.y);
-		}
 	}
 }
 
@@ -37,84 +32,25 @@ DWORD WINAPI suspend(LPVOID param) {
 DWORD WINAPI RecebeAvioes(LPVOID param) {
 	TDados* dados = (TDados*)param;
 	Aviao aviao;
-
 	while (!dados->ptr_memoria->terminar) {
-		bool novoAviao = true;
-		int pos = -1;
-		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR inicio
+
+		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 		// esperar semáforo dos aviões
 		WaitForSingleObject(dados->sem_itens, INFINITE);
-
 		// copiar o aviao recebido
-		CopyMemory(&aviao, &dados->ptr_modelo->avioesBuffer[dados->ptr_modelo->entAviao], sizeof(Aviao));
-
-		for (int i = 0; i <= dados->ptr_memoria->navioes; i++) {
-			if (aviao.id == dados->ptr_memoria->avioes[i].id) {
-				novoAviao = false;
-				pos = i;
-				//CopyMemory(&dados->ptr_memoria->avioes[i], &aviao, sizeof(Aviao));
-			}
+		CopyMemory(&aviao, &dados->ptr_memoria->avioes[dados->ptr_memoria->entAviao], sizeof(Aviao));
+		dados->ptr_memoria->entAviao++; 
+		 
+		// reset do buffer não é necessário
+		if (dados->ptr_memoria->entAviao == dados->ptr_memoria->maxavioes) {
+			dados->ptr_memoria->entAviao = dados->ptr_memoria->maxavioes;
 		}
 
-		HANDLE eventoComandos; // evento para lidar com a definição de um destino
-		eventoComandos = CreateEvent(NULL, FALSE, FALSE, EVENTO_COMANDOS);
-
-		if (novoAviao) { // é um novo aviao
-
-			// criar o evento de alerta para cada avião
-			TCHAR alerta[BUFFER];
-			_stprintf_s(alerta, BUFFER, TEXT("alerta %d"), aviao.id);
-			dados->eventos[dados->ptr_memoria->navioes] = CreateEvent(NULL, FALSE, FALSE, alerta);
-
-			if (checkNome(aviao.inicial.nome, dados->aeroportos, dados->ptr_memoria->naeroportos)) {
-				aviao.x = -1;
-				aviao.y = -1;
-				aviao.terminar = true;
-				CopyMemory(&dados->ptr_memoria->avioes[dados->ptr_memoria->navioes], &aviao, sizeof(Aviao)); // acrescenta o novo avião 
-				dados->ptr_memoria->navioes++; // incrementa o numero de aviões
-			}
-			else {
-				aviao.inicial = getAeroporto(aviao.inicial.nome, dados->aeroportos, dados->ptr_memoria->naeroportos);
-				aviao.x = getX(aviao.inicial.nome, dados->aeroportos, dados->ptr_memoria->naeroportos);
-				aviao.y = getY(aviao.inicial.nome, dados->aeroportos, dados->ptr_memoria->naeroportos);
-				CopyMemory(&dados->ptr_memoria->avioes[dados->ptr_memoria->navioes], &aviao, sizeof(Aviao)); // acrescenta o avião
-				dados->ptr_memoria->navioes++; // incrementa o número de aviões
-			}
-		}
-		else {
-			if (aviao.setDestino) { // esta a definir um novo destino
-				if (checkNome(aviao.destino.nome, dados->aeroportos, dados->ptr_memoria->naeroportos)) {
-					aviao.destino.x = -1;
-					aviao.destino.y = -1;
-					aviao.setDestino = false;
-					_tcscpy_s(aviao.destino.nome, BUFFER, TEXT(""));
-					CopyMemory(&dados->ptr_memoria->avioes[pos], &aviao, sizeof(Aviao));
-				}
-				else {
-					aviao.destino = getAeroporto(aviao.destino.nome, dados->aeroportos, dados->ptr_memoria->naeroportos);
-					aviao.setDestino = true;
-					CopyMemory(&dados->ptr_memoria->avioes[pos], &aviao, sizeof(Aviao));
-				}
-				SetEvent(eventoComandos);
-			}
-			if (aviao.embarcar) { // embarcar passageiros
-				//fazer alguma coisa
-			}
-			if (aviao.viajar) { // aviao está em movimento
-				CopyMemory(&dados->ptr_memoria->avioes[pos], &aviao, sizeof(Aviao));
-			}
-			if (aviao.terminarViagem) { // aviao chegou
-				_tprintf(TEXT("O avião %d chegou ao Aeroporto de destino.\n"), aviao.id);
-				aviao.inicial = aviao.destino;
-				CopyMemory(&dados->ptr_memoria->avioes[pos], &aviao, sizeof(Aviao));
-			}
-		}
-
-		dados->ptr_modelo->entAviao = (dados->ptr_modelo->entAviao + 1) % TAM; // incrementar a posicao de leitura
 		// assinala semáforo
 		ReleaseSemaphore(dados->sem_vazios, 1, NULL);
-		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR fim
+
+		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR
 
 		//_tprintf(TEXT("Aviao %d na posicao %d, %d.\n"), aviao.id, aviao.x, aviao.y);
 	}
@@ -125,14 +61,24 @@ DWORD WINAPI RecebeAlerta(LPVOID param) {
 	TDados* dados = (TDados*)param;
 	DWORD result;
 	while (!dados->ptr_memoria->terminar) {
-		if (dados->ptr_memoria->navioes > 0) {
-			for (int i = 0; i < dados->ptr_memoria->navioes; i++) {
-				result = WaitForSingleObject(dados->eventos[i], 1);
+		if (dados->ptr_memoria->entAviao > 0) {
+			for (int i = 0; i < dados->ptr_memoria->entAviao; i++) {
+				_stprintf_s(alerta, BUFFER, TEXT("alerta %d"), dados->ptr_memoria->avioes[i].id); // criar evento com o id do aviao
+				dados->ptr_memoria->avioes[i].eventos[0] = OpenEvent(EVENT_ALL_ACCESS, TRUE, alerta); // abrir o evento
+				if (dados->ptr_memoria->avioes[i].eventos[0] == NULL) {
+					_tprintf(TEXT("Erro não abri o evento.\n"));
+					_tprintf(TEXT("O controlador não vai funcionar normalmente, por favor reinicie.\n"));
+					return -1;
+				}
+			}
+			for (int i = 0; i < dados->ptr_memoria->entAviao; i++) {
+				result = WaitForSingleObject(dados->ptr_memoria->avioes[i].eventos[0], 100); // esperar pelos eventos de cada avião
 				if (result == WAIT_TIMEOUT) {
 					_tprintf(TEXT("Avião %d desligou-se.\n"), dados->ptr_memoria->avioes[i].id); // se não chegar é porque o avião se desligou
-					dados->ptr_memoria->avioes[i] = dados->ptr_memoria->avioes[i + 1]; // retira o avião
-					dados->ptr_memoria->navioes--; // decrementa o numero de aviões
-					ReleaseSemaphore(dados->sem_avioes, 1, NULL); // retira o aviao do semáforo
+					WaitForSingleObject(dados->mutex, INFINITE);
+					dados->ptr_memoria->avioes[i] = dados->ptr_memoria->avioes[i+1]; // retira o avião
+					dados->ptr_memoria->entAviao--;
+					ReleaseMutex(dados->mutex);
 				}
 			}
 		}
@@ -141,9 +87,36 @@ DWORD WINAPI RecebeAlerta(LPVOID param) {
 	return 0;
 }
 
+DWORD WINAPI RecebeChegada(LPVOID param) {
+	TDados* dados = (TDados*)param;
+	DWORD result;
+	TCHAR chegada[BUFFER];
+	while (!dados->ptr_memoria->terminar) {
+		if (dados->ptr_memoria->entAviao > 0) {
+			for (int i = 0; i < dados->ptr_memoria->entAviao; i++) {
+				_stprintf_s(chegada, BUFFER, TEXT("chegada %d"), dados->ptr_memoria->avioes[i].id); // criar evento com o id do avião
+				dados->ptr_memoria->avioes[i].eventos[1] = OpenEvent(EVENT_ALL_ACCESS, TRUE, chegada); // abrir o evento
+				if (dados->ptr_memoria->avioes[i].eventos[1] == NULL) {
+					_tprintf(TEXT("Erro não abri o evento.\n"));
+					_tprintf(TEXT("O controlador não vai funcionar normalmente, por favor reinicie.\n"));
+					return -1;
+				}
+			}
+			for (int i = 0; i < dados->ptr_memoria->entAviao; i++) {
+				result = WaitForSingleObject(dados->ptr_memoria->avioes[i].eventos[1], 100); // esperar pelas chegadas de cada avião
+				if (result == WAIT_OBJECT_0) {
+					_tprintf(TEXT("Avião %d chegou ao destino.\n"), dados->ptr_memoria->avioes[i].id); // mostrar a mensagem
+				}
+			}
+		}
+	}
+	return 0;
+}
+
 int _tmain(int argc, TCHAR* argv[]) {
-	HANDLE semaforo_execucao, objMapMem, objMapMod, hThread;
-	HKEY chaveMAX = NULL;
+	Aeroporto* aeroportos;
+	HANDLE semaforo_execucao, objMap, hThread;
+	HKEY chaveMAX = NULL, chaveAeroportos = NULL;
 	DWORD result = 0, cbdata = sizeof(DWORD);
 	TCHAR cmd[BUFFER] = TEXT("");
 	TDados dados;
@@ -167,28 +140,15 @@ int _tmain(int argc, TCHAR* argv[]) {
 		return -1;
 	}
 
-	// inicializar a memoria partilhada
-	objMapMem = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(Memoria), MEMORIA);
-	if (objMapMem == NULL) {
-		_tprintf(TEXT("Impossível criar objecto de mapping.\n"));
-		return;
-	}
-	dados.ptr_memoria = (Memoria*)MapViewOfFile(objMapMem, FILE_MAP_ALL_ACCESS, 0, 0, 0);
-	if (dados.ptr_memoria == NULL) {
-		_tprintf(TEXT("Impossível criar vista de memória partilhada.\n"));
-		return;
+	// inicializar a memória
+	objMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(Memoria), MEMORIA);
+	if (objMap == NULL) {
+		return -1;
 	}
 
-	// inicilizar a memoria partilhada do modelo produtor consumidor
-	objMapMod = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(Modelo), MODELO);
-	if (objMapMod == NULL) {
-		_tprintf(TEXT("Impossível criar objecto de mapping.\n"));
-		return;
-	}
-	dados.ptr_modelo = (Modelo*)MapViewOfFile(objMapMod, FILE_MAP_ALL_ACCESS, 0, 0, 0);
-	if (dados.ptr_modelo == NULL) {
-		_tprintf(TEXT("Impossivel criar vista de memória partilhada.\n"));
-		return;
+	dados.ptr_memoria = (Memoria*)MapViewOfFile(objMap, FILE_MAP_WRITE | FILE_MAP_READ, 0, 0, 0);
+	if (dados.ptr_memoria == NULL) {
+		return -1;
 	}
 
 	// verifica se a chave abre
@@ -225,19 +185,12 @@ int _tmain(int argc, TCHAR* argv[]) {
 	//_tprintf(TEXT("NUMERO DE AEROPORTOS: %ld\n"), dados.ptr_memoria->naeroportos);
 	//_tprintf(TEXT("NUMERO DE AVIOES: %ld\n"), dados.ptr_memoria->navioes);
 
+	// registar ou abrir chave para registo de aeroportos
+	RegCreateKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chaveAeroportos, NULL);
 
 	// inicializa array de aeroportos
-	dados.aeroportos = malloc(sizeof(Aeroporto) * dados.ptr_memoria->maxaeroportos);
-	memset(dados.aeroportos, 0, (size_t)dados.ptr_memoria->maxaeroportos * sizeof(Aeroporto));
-
-	/* DEBUG PARA SER MAIS FACIL UTILIZAR */
-	_tcscpy_s(dados.aeroportos[0].nome, BUFFER, TEXT("Lisboa"));
-	dados.aeroportos[0].x = 30;
-	dados.aeroportos[0].y = 40;
-	_tcscpy_s(dados.aeroportos[1].nome, BUFFER, TEXT("Porto"));
-	dados.aeroportos[1].x = 999;
-	dados.aeroportos[1].y = 999;
-	dados.ptr_memoria->naeroportos = 2;
+	aeroportos = malloc(sizeof(Aeroporto) * dados.ptr_memoria->maxaeroportos);
+	memset(aeroportos, 0, (size_t)dados.ptr_memoria->maxaeroportos * sizeof(Aeroporto));
 
 	// lança thread para controlar a entrada de aviões
 	hThread = CreateThread(NULL, 0, RecebeAvioes, &dados, 0, NULL);
@@ -245,6 +198,10 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// inicializa a thread para receber alertas
 	HANDLE hAlerta;
 	hAlerta = CreateThread(NULL, 0, RecebeAlerta, &dados, 0, NULL);
+
+	// inicializa a thread para receber alertas de chegadas
+	HANDLE hChegada;
+	hChegada = CreateThread(NULL, 0, RecebeChegada, &dados, 0, NULL);
 
 	// inicializa suspensao de dados como falso
 	dados.suspend = false;
@@ -264,7 +221,9 @@ int _tmain(int argc, TCHAR* argv[]) {
 		int cmdOpt = _tstoi(cmd);
 		switch (cmdOpt) {
 		case 1:
-			criaAeroporto(dados.aeroportos, &dados.ptr_memoria->naeroportos, dados.ptr_memoria->maxaeroportos);
+			if (criaAeroporto(aeroportos, &dados.ptr_memoria->naeroportos, dados.ptr_memoria->maxaeroportos)) {
+				RegistaAeroporto(aeroportos[dados.ptr_memoria->naeroportos - 1], chaveAeroportos);
+			}
 			break;
 		case 2:
 			HANDLE susThread; 
@@ -287,8 +246,8 @@ int _tmain(int argc, TCHAR* argv[]) {
 			}
 			break;
 		case 3:
-			listaAeroportos(dados.aeroportos, dados.ptr_memoria->naeroportos);
-			listaAvioes(dados.ptr_memoria->avioes, dados.ptr_memoria->navioes);
+			listaAeroportos(aeroportos, dados.ptr_memoria->naeroportos);
+			listaAvioes(dados.ptr_memoria->avioes, dados.ptr_memoria->entAviao);
 			break;
 		}
 	} while (_tcsicmp(cmd, TEXT("fim")) != 0);
@@ -299,8 +258,16 @@ int _tmain(int argc, TCHAR* argv[]) {
 	//ReleaseMutex(dados.mutex);
 	WaitForSingleObject(hThread, 0);
 
+	// apagar as chaves dos Aeroportos antes de encerrar.
+	RegDeleteTree(chaveAeroportos, NULL);
+	result = RegDeleteKeyEx(HKEY_CURRENT_USER, CHAVE_AEROPORTOS, KEY_WOW64_64KEY, 0);
+
+	// DEBUG
+	//if (result == ERROR_SUCCESS) {
+	//	_tprintf(TEXT("Apaguei a chave dos aeroportos.\n"));
+	//}
+
 	UnmapViewOfFile(dados.ptr_memoria);
-	UnmapViewOfFile(dados.ptr_modelo);
 
 	return 0;
 	

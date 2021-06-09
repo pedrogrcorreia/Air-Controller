@@ -48,6 +48,22 @@ bool criaAeroporto(Aeroporto* aeroportos, int* numae, int maxae) {
 	return true;
 }
 
+bool RegistaAeroporto(Aeroporto novo, HANDLE chave) {
+	HKEY temp;
+	TCHAR x[BUFFER], y[BUFFER];
+	//TCHAR x_valor[BUFFER], y_valor[BUFFER];
+	DWORD xvalor = novo.x, yvalor = novo.y;
+	RegCreateKeyEx(chave, novo.nome, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &temp, NULL);
+	_tcscpy_s(x, BUFFER, TEXT("x"));
+	_tcscpy_s(y, BUFFER, TEXT("y"));
+
+	RegSetValueEx(temp, (LPCWSTR)x, 0, REG_DWORD, (const BYTE*)&xvalor, sizeof(xvalor));
+	RegSetValueEx(temp, (LPCWSTR)y, 0, REG_DWORD, (const BYTE*)&yvalor, sizeof(yvalor));
+	RegCloseKey(temp);
+	return true;
+	
+}
+
 bool checkNome(TCHAR nome[], Aeroporto* aeroportos, int numae) {
 	for (int i = 0; i < numae; i++) {
 		if (_tcsicmp(aeroportos[i].nome, nome) == 0) {
@@ -85,6 +101,7 @@ bool checkCoordenadas(int x, int y, Aeroporto* aeroportos, int numae) {
 		}
 	}
 	return true;
+<<<<<<< HEAD
 }
 
 Aeroporto getAeroporto(TCHAR nome[], Aeroporto* aeroportos, int numae) {
@@ -112,4 +129,6 @@ int getY(TCHAR nome[], Aeroporto* aeroportos, int numae) {
 		}
 	}
 	return -1;
+=======
+>>>>>>> parent of bf23a58 (final console version)
 }
