@@ -33,10 +33,13 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="..\..\..\SO II\Ficha 8\FLAG_B24.BMP">
+    <Image Include="aviao.bmp">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="..\..\..\so ii\ficha 8\bitmap2.bmp">
+    <Image Include="aeroporto.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="icon.ico">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

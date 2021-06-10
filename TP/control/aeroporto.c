@@ -7,6 +7,29 @@
 #include <stdbool.h>
 #include "../aeroporto.h"
 
+
+bool criaAeroportoGUI(Aeroporto* aeroportos, int* numae, int maxae, TCHAR nome[], int x, int y) {
+	if (!checkNome(nome, aeroportos, *numae)) {
+		return false;
+	}
+	if (x < 0 || x>1000 || y < 0 || y>1000) {
+		return false;
+	}
+	if (!checkCoordenadas(x, y, aeroportos, *numae)) {
+		return false;
+	}
+
+	if (*numae >= maxae) {
+		return false;
+	}
+
+	_tcscpy_s(aeroportos[*numae].nome, BUFFER, nome);
+	aeroportos[*numae].x = x;
+	aeroportos[*numae].y = y;
+	*numae += 1;
+	return true;
+}
+
 bool criaAeroporto(Aeroporto* aeroportos, int* numae, int maxae) {
 	TCHAR nome[BUFFER];
 	int x = 0, y = 0;
