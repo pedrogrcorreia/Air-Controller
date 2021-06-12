@@ -40,8 +40,9 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 	while (!(*dados)->ptr_memoria->terminar && !(*dados)->self.terminar) {
 		(*dados)->self = getAviao((*dados)->self, **dados);
 		(*dados)->self.setDestino = false;
+		(*dados)->self.embarcar = false;
 		(*dados)->self.viajar = true;
-		//SetEvent((*dados)->self.eventos[0]);
+
 		Sleep(1000 / (*dados)->self.velocidade);
 
 		move((*dados)->self.x, (*dados)->self.y, (*dados)->self.destino.x, (*dados)->self.destino.y, &(*dados)->self.x, &(*dados)->self.y);
@@ -214,8 +215,34 @@ DWORD WINAPI leComandos(LPVOID param) {
 				_tprintf(TEXT("\nNecessita de introduzir um destino primeiro.\n"));
 			}
 		}
-		if (_tcsicmp(comando, TEXT("debug")) == 0) {
-			_tprintf(TEXT("%d %d"), dados->ptr_memoria->avioes[0].x, dados->ptr_memoria->avioes[0].y);
+		if (_tcsicmp(comando, TEXT("embarcar")) == 0) {
+			dados->self.embarcar = true;
+			// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR inicio
+
+			// esperar semáforo vazio e o mutex
+			WaitForSingleObject(dados->sem_vazios, INFINITE);
+			WaitForSingleObject(dados->mutex, INFINITE);
+
+			// copiar o avião
+			CopyMemory(&dados->ptr_modelo->avioesBuffer[dados->ptr_modelo->saiAviao], &dados->self, sizeof(Aviao));
+			dados->ptr_modelo->saiAviao = (dados->ptr_modelo->saiAviao + 1) % TAM; // incrementar a posicao de escrita
+
+			// assinalar mutex
+			ReleaseMutex(dados->mutex);
+
+			// assinala semáforo
+			ReleaseSemaphore(dados->sem_itens, 1, NULL);
+
+			// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR final
+
+			HANDLE setDestino;
+			setDestino = CreateEvent(NULL, FALSE, FALSE, EVENTO_COMANDOS);
+			if (setDestino == NULL) {
+				return -1;
+			}
+			WaitForSingleObject(setDestino, INFINITE); // sincronizar a receção do aeroporto por parte do controlador
+
+			dados->self = getAviao(dados->self, *dados); // obter o novo avião com o destino definido
 		}
 	} while (_tcsicmp(cmd, TEXT("fim")) != 0);
 
@@ -287,6 +314,9 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// obtem os dados passados por argumento da linha de comando -> aeroporto inicial e velocidade 
 	_tcscpy_s(dados.self.inicial.nome, BUFFER, argv[1]);
 	dados.self.velocidade = _tstoi(argv[2]);
+
+	// DEBUG *E*E#*P*FEKFEA
+	dados.self.lotacao = 10;
 
 	// inicializar a memoria partilhada
 	objMapMem = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(Memoria), MEMORIA);

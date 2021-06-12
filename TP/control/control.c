@@ -9,7 +9,10 @@
 #include "resource.h"
 #include "../util.h"
 
-#define BUFFER 200
+#define BUFSIZE 2048
+#define Ps_Sz sizeof(Passageiro)
+
+#define Msg_Sz sizeof(Msg)
 
 void listaAeroportos(Aeroporto aeroportos[], int nae) {
 	_tprintf(TEXT("\nExistem %d aeroportos.\n"), nae);
@@ -32,6 +35,208 @@ DWORD WINAPI suspend(LPVOID param) {
 	TDados** dados = (TDados**)param;
 	for (int i = (*dados)->ptr_memoria->navioes; i < (*dados)->ptr_memoria->maxavioes; i++) {
 		WaitForSingleObject((*dados)->sem_avioes, INFINITE);
+	}
+	return 0;
+}
+
+void iniciaPassageiros(TDados* dados) {
+	int i;
+	for (i = 0; i < MAXPASSAG; i++) {
+		dados->p[i].hPipe = NULL;
+	}
+}
+
+void adicionaPassageiro(TDados* dados, HANDLE pass) {
+	int i;
+	for (i = 0; i < MAXPASSAG; i++) {
+		if (dados->p[i].hPipe == NULL) {
+			dados->p[i].hPipe = pass;
+			dados->numpassag++;
+			return;
+		}
+	}
+}
+
+void removePassageiro(TDados* dados, HANDLE pass) {
+	int i;
+	for (i = 0; i < MAXPASSAG; i++) {
+		if (dados->p[i].hPipe == pass) {
+			dados->p[i].hPipe = NULL;
+			dados->numpassag--;
+			return;
+		}
+	}
+}
+
+void registaPassageiro(TDados* dados, Passageiro p) {
+	for (int i = 0; i < MAXPASSAG; i++) {
+		if (dados->p[i].hPipe == p.hPipe) {
+			_tcscpy_s(dados->p[i].inicial, BUFFER, p.inicial);
+			_tcscpy_s(dados->p[i].destino, BUFFER, p.destino);
+			return;
+		}
+	}
+}
+
+void embarcaPassageiro(TDados* dados, Aviao a) {
+	for (int i = 0; i < dados->numpassag; i++) {
+		if (_tcsicmp(dados->p[i].inicial, a.inicial.nome) == 0 && _tcsicmp(dados->p[i].destino, a.destino.nome) == 0) {
+			//_tprintf(TEXT("%s %s"), dados->p[i].inicial, a.inicial.nome);
+			//_tprintf(TEXT("%s %s"), dados->p[i].destino, a.destino.nome);
+			dados->p[i].voo = a.id;
+			_tcscpy_s(dados->p[i].mensagem, BUFFER, TEXT("Embarcar"));
+			writePassageiroASINC(dados->p[i].hPipe, dados->p[i]);
+			return; // falta meter a lotacao
+		}
+	}
+}
+
+void movePassageiro(TDados* dados, Aviao a) {
+	for (int i = 0; i < dados->numpassag; i++) {
+		if (dados->p[i].voo == a.id) {
+			dados->p[i].x = a.x;
+			dados->p[i].y = a.y;
+			_tcscpy_s(dados->p[i].mensagem, BUFFER, TEXT("Viajar"));
+			//writePassageiroASINC(dados->p[i].hPipe, dados->p[i]);
+			return;
+		}
+	}
+}
+
+void avisaChegada(TDados* dados, Aviao a) {
+	for (int i = 0; i < dados->numpassag; i++) {
+		if (dados->p[i].voo == a.id) {
+			_tcscpy_s(dados->p[i].mensagem, BUFFER, TEXT("Chegada"));
+			writePassageiroASINC(dados->p[i].hPipe, dados->p[i]);
+			return;
+		}
+	}
+}
+
+HANDLE WriteReady;
+
+int writePassageiroASINC(HANDLE hPipe, Passageiro p) {
+	DWORD cbWritten = 0;
+	BOOL fSuccess = FALSE;
+
+	OVERLAPPED OverlWr = { 0 };
+
+	ZeroMemory(&OverlWr, sizeof(OverlWr));
+	ResetEvent(WriteReady);
+	OverlWr.hEvent = WriteReady;
+
+	fSuccess = WriteFile(hPipe, &p, Ps_Sz, &cbWritten, &OverlWr);
+
+	WaitForSingleObject(WriteReady, INFINITE);
+	GetOverlappedResult(hPipe, &OverlWr, &cbWritten, FALSE);
+	return 1;
+}
+
+
+int broadcastPassageiros(TDados* dados, Passageiro p) {
+	int i, numwrites = 0;
+	for (i = 0; i < MAXPASSAG; i++) {
+		if (dados->p[i].hPipe != 0) {
+			numwrites += writePassageiroASINC(dados->p[i].hPipe, p);
+		}
+	}
+	return numwrites;
+}
+
+DWORD WINAPI PassagThread(LPVOID param) {
+	Passageiro Recebido, Enviado;
+	DWORD cbBytesRead = 0, cbReplyBytes = 0;
+	int numresp = 0;
+	BOOL fSuccess = FALSE;
+	TDados* dados = (TDados*)param;
+	HANDLE hPipe = dados->cPipe;
+	HANDLE ReadReady;
+	OVERLAPPED OverlRd = { 0 };
+	ReadReady = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	adicionaPassageiro(dados, hPipe);
+
+	while (1) {
+		ZeroMemory(&OverlRd, sizeof(OverlRd));
+		ResetEvent(ReadReady);
+		OverlRd.hEvent = ReadReady;
+
+		fSuccess = ReadFile(hPipe, &Recebido, Ps_Sz, &cbBytesRead, &OverlRd);
+
+		WaitForSingleObject(ReadReady, INFINITE);
+
+		GetOverlappedResult(hPipe, &OverlRd, &cbBytesRead, FALSE);
+		_tprintf(TEXT("Passageiro definiu aeroportos %s %s\n"), Recebido.inicial, Recebido.destino);
+		for (int i = 0; i < dados->ptr_memoria->naeroportos; i++) {
+			if (_tcsicmp(Recebido.inicial, dados->aeroportos[i].nome) == 0) {
+				_tcscpy_s(Enviado.inicial, BUFFER, Recebido.inicial);
+				Enviado.termina = false;
+			}
+			else {
+				_tcscpy_s(Enviado.mensagem, BUFFER, TEXT("O aeroporto inicial não existe. O programa vai terminar."));
+				Enviado.termina = true;
+			}
+		}
+		for (int i = 0; i < dados->ptr_memoria->naeroportos; i++) {
+			if (_tcsicmp(Recebido.destino, dados->aeroportos[i].nome) == 0) {
+				_tcscpy_s(Enviado.destino, BUFFER, Recebido.destino);
+				Enviado.termina = false;
+			}
+			else {
+				_tcscpy_s(Enviado.mensagem, BUFFER, TEXT("O aeroporto de destino não existe. O programa vai terminar."));
+				Enviado.termina = true;
+			}
+		}
+
+		if (!Enviado.termina) {
+			Enviado.hPipe = hPipe;
+			registaPassageiro(dados, Enviado);
+			_tcscpy_s(Enviado.mensagem, BUFFER, TEXT("Avião no aeroporto inicial."));
+		}
+		numresp = broadcastPassageiros(dados, Enviado);
+		//Enviado.termina = false;
+		if (Enviado.termina == true || Recebido.termina == true) {
+			break;
+		}
+		//_tprintf(TEXT("Servidor: %d respostas enviadas\n"), numresp);
+	}
+
+	removePassageiro(dados, hPipe);
+	FlushFileBuffers(hPipe);
+	DisconnectNamedPipe(hPipe);
+	CloseHandle(hPipe);
+
+	_tprintf(TEXT("Thread a terminar"));
+	return 1;
+}
+
+DWORD WINAPI RecebePassageiros(LPVOID param) {
+	TDados* dados = (TDados*)param;
+	BOOL fConnected = FALSE;
+	DWORD dwThreadId = 0;
+	HANDLE hThread = NULL;
+	HANDLE hPipe;
+	WriteReady = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	iniciaPassageiros(dados);
+	while (1) {
+		hPipe = CreateNamedPipe(PIPE_CONTROL, PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, BUFSIZE, BUFSIZE, 5000, NULL);
+		_tprintf(TEXT("\nServidor a aguardar por clientes\n"));
+		dados->cPipe = hPipe;
+		fConnected = ConnectNamedPipe(hPipe, NULL) ? TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
+
+		if (fConnected) {
+			hThread = CreateThread(NULL, 0, PassagThread, (LPVOID)dados, 0, &dwThreadId);
+			if (hThread == NULL) {
+				return -1;
+			}
+			else {
+				CloseHandle(hThread);
+			}
+		}
+		else {
+			CloseHandle(hPipe);
+		}
 	}
 	return 0;
 }
@@ -101,19 +306,38 @@ DWORD WINAPI RecebeAvioes(LPVOID param) {
 				SetEvent(eventoComandos);
 			}
 			if (aviao.embarcar) { // embarcar passageiros
-				//fazer alguma coisa
+				//Passageiro p;
+				//_tcscpy_s(p.mensagem, BUFFER, TEXT("Embarcar"));
+				//_tcscpy_s(p.inicial, BUFFER, aviao.inicial.nome);
+				//_tcscpy_s(p.destino, BUFFER, aviao.destino.nome);
+				//p.voo = aviao.id;
+				CopyMemory(&dados->ptr_memoria->avioes[pos], &aviao, sizeof(Aviao));
+				embarcaPassageiro(dados, aviao);
+				SetEvent(eventoComandos);
 			}
 			if (aviao.viajar) { // aviao está em movimento
+				//Passageiro p;
+				//_tcscpy_s(p.mensagem, BUFFER, TEXT("Viajar"));
+				//_tcscpy_s(p.inicial, BUFFER, aviao.inicial.nome);
+				//_tcscpy_s(p.destino, BUFFER, aviao.destino.nome);
+				//p.x = aviao.x;
+				//p.y = aviao.y;
+				//p.voo = aviao.id;
 				CopyMemory(&dados->ptr_memoria->avioes[pos], &aviao, sizeof(Aviao));
+				movePassageiro(dados, aviao);
+				//broadcastPassageiros(dados, p);
 			}
 			if (aviao.terminarViagem) { // aviao chegou
+				Passageiro p;
+				_tcscpy_s(p.mensagem, BUFFER, TEXT("Chegada"));
+				_tcscpy_s(p.destino, BUFFER, aviao.destino.nome);
 				_tprintf(TEXT("O avião %d chegou ao Aeroporto de destino.\n"), aviao.id);
 				aviao.inicial = aviao.destino;
 				CopyMemory(&dados->ptr_memoria->avioes[pos], &aviao, sizeof(Aviao));
+				avisaChegada(dados, aviao);
 			}
 		}
-		InvalidateRect(dados->hWnd, NULL, TRUE);
-		TextOut(dados->hWnd, 40, 40, TEXT("DEBUG"), _tcslen(TEXT("DEBUG")));
+		//InvalidateRect(dados->hWnd, NULL, TRUE);
 		dados->ptr_modelo->entAviao = (dados->ptr_modelo->entAviao + 1) % TAM; // incrementar a posicao de leitura
 		// assinala semáforo
 		ReleaseSemaphore(dados->sem_vazios, 1, NULL);
@@ -196,14 +420,13 @@ ATOM RegistaClasse(HINSTANCE hInst, TCHAR* szWinName) {
 	wcl.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcl.lpszMenuName = MAKEINTRESOURCE(IDR_MENU1);
 	wcl.cbClsExtra = sizeof(TDados);
-	wcl.cbWndExtra = sizeof(TDados*);
+	wcl.cbWndExtra = sizeof(TDados);// sizeof(TDados*);
 	wcl.hbrBackground = (HBRUSH)GetStockObject(GRAY_BRUSH);
 
 	return RegisterClassEx(&wcl);
 }
 
 HWND CriarJanela(HINSTANCE hInst, TCHAR* szWinName) {
-
 	return CreateWindow(
 		szWinName,
 		TEXT("Controlador Aéreo"),
@@ -224,7 +447,7 @@ INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR lpCmdLine, int nC
 	HKEY chaveMAX = NULL;
 	DWORD result = 0, cbdata = sizeof(DWORD);
 	TDados dados;
-	
+
 	TCHAR janelaPrinc[] = TEXT("Controlador Aéreo");
 	HWND hWnd;
 	MSG msg;
@@ -321,6 +544,11 @@ INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR lpCmdLine, int nC
 
 	dados.hWnd = hWnd;
 
+	// lança thread para controlar passageiros
+	HANDLE hPass;
+	hPass = CreateThread(NULL, 0, RecebePassageiros, &dados, 0, NULL);
+
+
 	// lança thread para controlar a entrada de aviões
 	hThread = CreateThread(NULL, 0, RecebeAvioes, &dados, 0, NULL);
 
@@ -342,7 +570,8 @@ INT WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR lpCmdLine, int nC
 		DispatchMessage(&msg);
 	}
 
-	//dados.ptr_memoria->terminar = true;
+	dados.ptr_memoria->terminar = true;
+	return -1;
 }
 
 BOOL CALLBACK dListarAeroportos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lParam) {
@@ -380,8 +609,7 @@ BOOL CALLBACK dListarAeroportos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPa
 }
 
 BOOL CALLBACK dCriarAeroportos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lParam) {
-	TCHAR texto[BUFFER], titulo[BUFFER], nome[BUFFER], xT[BUFFER], yT[BUFFER];
-	int indice;
+	TCHAR texto[BUFFER], nome[BUFFER], xT[BUFFER], yT[BUFFER];
 	TDados* dados;
 	HWND h;
 	int x = 0, y = 0, result;
@@ -461,7 +689,7 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 	static HANDLE thread;
 	PAINTSTRUCT paint;
 	TCHAR texto[BUFFER] = TEXT("A");
-	int x=0, y=0;
+	int x = 0, y = 0;
 
 	TDados* dados;
 	dados = (TDados*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
@@ -486,32 +714,32 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 		DeleteObject(foto);
 		ReleaseDC(hWnd, hdc);
 		break;
-	//case WM_LBUTTONDOWN:
-	//	hdc = GetDC(hWnd);
-	//	auxdc = CreateCompatibleDC(hdc);
-	//	x = LOWORD(lParam);
-	//	y = HIWORD(lParam);
-	//	SelectObject(auxdc, bmpAviao);
-	//	BitBlt(hdc, x, y, 134, 134, auxdc, 0, 0, SRCCOPY);
-	//	BitBlt(double_dc, x, y, 134, 134, auxdc, 0, 0, SRCCOPY);
-	//	DeleteDC(auxdc);
-	//	ReleaseDC(hWnd, hdc);
-	//	InvalidateRect(hWnd, NULL, TRUE);
-	//	break;
+		//case WM_LBUTTONDOWN:
+		//	hdc = GetDC(hWnd);
+		//	auxdc = CreateCompatibleDC(hdc);
+		//	x = LOWORD(lParam);
+		//	y = HIWORD(lParam);
+		//	SelectObject(auxdc, bmpAviao);
+		//	BitBlt(hdc, x, y, 134, 134, auxdc, 0, 0, SRCCOPY);
+		//	BitBlt(double_dc, x, y, 134, 134, auxdc, 0, 0, SRCCOPY);
+		//	DeleteDC(auxdc);
+		//	ReleaseDC(hWnd, hdc);
+		//	InvalidateRect(hWnd, NULL, TRUE);
+		//	break;
 	case WM_DESTROY:
 		DeleteObject(bmpAviao);
 		DeleteObject(bmpAeroporto);
 		PostQuitMessage(0);
 		break;
-	//case WM_SIZE:
-	//	GetWindowRect(hWnd, &paint.rcPaint);
-	//	//_stprintf_s(texto, 100, TEXT("Dimensões da janela: largura-> %d altura -> %d"), paint.rcPaint.right, paint.rcPaint.bottom);
-	//	//altura = paint.rcPaint.bottom / 2 - 134;
-	//	x = paint.rcPaint.right / 2 - 134;
-	//	InvalidateRect(hWnd, NULL, TRUE);
-	//	//Calcular nova altura e largura
-	//	//Gerar um evento WM_PAINT
-	//	break;
+		//case WM_SIZE:
+		//	GetWindowRect(hWnd, &paint.rcPaint);
+		//	//_stprintf_s(texto, 100, TEXT("Dimensões da janela: largura-> %d altura -> %d"), paint.rcPaint.right, paint.rcPaint.bottom);
+		//	//altura = paint.rcPaint.bottom / 2 - 134;
+		//	x = paint.rcPaint.right / 2 - 134;
+		//	InvalidateRect(hWnd, NULL, TRUE);
+		//	//Calcular nova altura e largura
+		//	//Gerar um evento WM_PAINT
+		//	break;
 	case WM_CHAR:
 		//+ -> aumentar a velocidade (ou dimunir o tempo a parar entre cada ciclo do for)
 		//- -> dimunir a velocidade (ou aumentaro tempo a parar entre cada ciclo do for)
@@ -522,7 +750,7 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 		auxdc = CreateCompatibleDC(hdc);
 		x = LOWORD(lParam);
 		y = HIWORD(lParam);
-				SelectObject(auxdc, bmpAeroporto);
+		SelectObject(auxdc, bmpAeroporto);
 		if (dados->ptr_memoria->naeroportos > 0) {
 			for (int i = 0; i < dados->ptr_memoria->naeroportos; i++) {
 				BitBlt(hdc, dados->aeroportos[i].x, dados->aeroportos[i].y, 30, 30, auxdc, 0, 0, SRCCOPY);
@@ -566,8 +794,8 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 		EndPaint(hWnd, &paint);
 		break;
 	case WM_COMMAND:
-            //if (LOWORD(wParam) == ID_SOBRE)
-            //    MessageBox(hWnd, TEXT("Opção Sobre"), TEXT("Título"), MB_OK);
+		//if (LOWORD(wParam) == ID_SOBRE)
+		//    MessageBox(hWnd, TEXT("Opção Sobre"), TEXT("Título"), MB_OK);
 		if (LOWORD(wParam) == ID_AEROPORTOS_CRIARAEROPORTOS) {
 			DialogBox(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_DIALOGCRIAR), hWnd, dCriarAeroportos);
 		}
@@ -602,7 +830,7 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 				MessageBox(hWnd, TEXT("Registo de aviões já se encontra ativo."), TEXT("Ativar registos"), MB_ICONERROR);
 			}
 		}
-        break;
+		break;
 	case WM_ERASEBKGND:
 		return (LRESULT)1;
 	case  WM_MOUSEMOVE:

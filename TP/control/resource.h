@@ -18,6 +18,7 @@
 #define IDC_BSAIR                       1009
 #define IDC_BADD                        1010
 #define IDC_LIST1                       1011
+#define IDC_SCROLLBAR1                  1013
 #define ID_AEROPORTOS_CRIARAEROPORTOS   40001
 #define ID_AEROPORTOS_LISTARAEROPORTOS  40002
 #define ID_AVI40003                     40003
@@ -32,7 +33,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        113
 #define _APS_NEXT_COMMAND_VALUE         40008
-#define _APS_NEXT_CONTROL_VALUE         1013
+#define _APS_NEXT_CONTROL_VALUE         1014
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

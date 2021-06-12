@@ -4,12 +4,15 @@
 #define MODELO TEXT("Modelo produtor consumidor")
 #define SEMAFORO_CONTROLADOR TEXT("Semáforo de execução do controlador")
 #define SEMAFORO_INSTANCIAS TEXT("Semáforo de execução de aviões")
-#define CHAVE_AEROPORTOS TEXT("SOFTWARE\\temp\\SO2\\Aeroportos")
 #define SEMAFORO_ITENS TEXT("Semáforo dos itens")
 #define SEMAFORO_VAZIOS TEXT("Semáforo das posições vazias")
 #define MUTEX_CONTROL TEXT("Mutex do controlador")
 #define EVENTO_COMANDOS TEXT("Evento para controlo de comandos")
+#define PIPE_CONTROL TEXT("\\\\.\\pipe\\control")
+#define PIPE_TESTE TEXT("\\\\.\\pipe\\teste")
+#define BUFFER 200
 #define TAM 100 // TAMANHO DO BUFFER CIRCULAR
+#define MAXPASSAG 25 // NUMERO MÁXIMO DE PASSAGEIROS
 
 typedef struct {
 	DWORD id;
@@ -17,6 +20,7 @@ typedef struct {
 	int y;
 	int pos;
 	int velocidade;
+	int lotacao;
 	bool terminar;
 	bool terminarViagem;
 	bool setDestino;
@@ -25,6 +29,16 @@ typedef struct {
 	Aeroporto inicial;
 	Aeroporto destino;
 } Aviao;
+
+typedef struct {
+	TCHAR inicial[BUFFER];
+	TCHAR destino[BUFFER];
+	TCHAR mensagem[BUFFER];
+	bool termina;
+	int voo;
+	int x, y;
+	HANDLE hPipe;
+} Passageiro;
 
 typedef struct {
 	int entAviao; // controlo do modelo produtor - consumidor
@@ -52,5 +66,8 @@ typedef struct {
 	Aeroporto* aeroportos;
 	bool suspend;
 	HWND hWnd;
+	HANDLE cPipe;
+	int numpassag;
+	Passageiro p[MAXPASSAG];
 	HANDLE eventos[];
 } TDados;
