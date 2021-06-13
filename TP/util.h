@@ -9,8 +9,7 @@
 #define MUTEX_CONTROL TEXT("Mutex do controlador")
 #define EVENTO_COMANDOS TEXT("Evento para controlo de comandos")
 #define PIPE_CONTROL TEXT("\\\\.\\pipe\\control")
-#define PIPE_TESTE TEXT("\\\\.\\pipe\\teste")
-#define BUFFER 200
+#define BUFFER 100
 #define TAM 100 // TAMANHO DO BUFFER CIRCULAR
 #define MAXPASSAG 25 // NUMERO MÁXIMO DE PASSAGEIROS
 
@@ -33,8 +32,10 @@ typedef struct {
 typedef struct {
 	TCHAR inicial[BUFFER];
 	TCHAR destino[BUFFER];
+	TCHAR nome[BUFFER];
 	TCHAR mensagem[BUFFER];
 	bool termina;
+	int espera;
 	int voo;
 	int x, y;
 	HANDLE hPipe;
@@ -66,6 +67,7 @@ typedef struct {
 	Aeroporto* aeroportos;
 	bool suspend;
 	HWND hWnd;
+	HWND hPop;
 	HANDLE cPipe;
 	int numpassag;
 	Passageiro p[MAXPASSAG];

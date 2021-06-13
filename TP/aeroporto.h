@@ -1,6 +1,6 @@
 #include <tchar.h>
 #include <stdbool.h>
-#define BUFFER 200
+#define BUFFER 100
 
 typedef struct {
 	TCHAR nome[BUFFER];
