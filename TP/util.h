@@ -11,7 +11,7 @@
 #define PIPE_CONTROL TEXT("\\\\.\\pipe\\control")
 #define BUFFER 100
 #define TAM 100 // TAMANHO DO BUFFER CIRCULAR
-#define MAXPASSAG 25 // NUMERO MÁXIMO DE PASSAGEIROS
+#define MAXPASSAG 10 // NUMERO MÁXIMO DE PASSAGEIROS
 
 typedef struct {
 	DWORD id;

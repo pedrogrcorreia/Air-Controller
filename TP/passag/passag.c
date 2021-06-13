@@ -10,8 +10,6 @@
 
 #define Ps_Sz sizeof(Passageiro)
 
-bool termina = false;
-
 void readTChars(TCHAR* p, int maxchars) {
 	int len;
 	_fgetts(p, maxchars, stdin);
@@ -20,14 +18,7 @@ void readTChars(TCHAR* p, int maxchars) {
 		p[len - 1] = TEXT('\0');
 }
 
-//void pressEnter() {
-//	TCHAR somekeys[25];
-//	_tprintf(TEXT("\nPress enter >"));
-//	readTChars(somekeys, 25);
-//}
-
 DWORD WINAPI ThreadPassageiroReader(LPVOID lpvParam) {
-	//Msg FromServer;
 	Passageiro FromServer;
 	DWORD cbBytesRead = 0;
 	BOOL fSuccess = FALSE;
@@ -38,8 +29,7 @@ DWORD WINAPI ThreadPassageiroReader(LPVOID lpvParam) {
 	OVERLAPPED OverlRd = { 0 };
 
 	ReadReady = CreateEvent(NULL, TRUE, FALSE, NULL);
-	//_tprintf(TEXT("Thread Reader - a receber mensagens\n"));
-
+	
 	while (!eu->termina) {
 		ZeroMemory(&OverlRd, sizeof(OverlRd));
 		OverlRd.hEvent = ReadReady;
@@ -48,10 +38,8 @@ DWORD WINAPI ThreadPassageiroReader(LPVOID lpvParam) {
 		fSuccess = ReadFile(hPipe, &FromServer, Ps_Sz, &cbBytesRead, &OverlRd);
 
 		WaitForSingleObject(ReadReady, INFINITE);
-		//_tprintf(TEXT("\nRead concluido"));
 
 		GetOverlappedResult(hPipe, &OverlRd, &cbBytesRead, FALSE);
-		//_tprintf(TEXT("\nMensagem do controlador!\n"));
 
 		if (_tcsicmp(FromServer.mensagem, TEXT("Registo")) == 0) {
 			_tprintf(TEXT("Passageiro registado no aeroporto %s com destino a %s\n"), FromServer.inicial, FromServer.destino);
@@ -65,6 +53,9 @@ DWORD WINAPI ThreadPassageiroReader(LPVOID lpvParam) {
 		else if(_tcsicmp(FromServer.mensagem, TEXT("Chegada")) == 0) {
 			_tprintf(TEXT("Passageiro chegou ao destino %s.\n"), FromServer.destino);
 		}
+		else if (_tcsicmp(FromServer.mensagem, TEXT("Termina")) == 0) {
+			_tprintf(TEXT("Passageiro terminou.\n"));
+		}
 		else {
 			_tprintf(TEXT("%s\n"), FromServer.mensagem);
 		}
@@ -76,8 +67,6 @@ DWORD WINAPI ThreadPassageiroReader(LPVOID lpvParam) {
 
 	}
 	CloseHandle(ReadReady);
-	//CloseHandle(hPipe);
-	//_tprintf(TEXT("Thread reader a terminar\n"));
 	return 1;
 }
 
@@ -92,6 +81,7 @@ DWORD WINAPI ThreadPassageiroWrite(LPVOID lparam) {
 	WriteReady = CreateEvent(NULL, TRUE, FALSE, NULL);
 	bool firstRun = true;
 	_tprintf(TEXT("Ligacao feita ao Controlador Aéreo.\n"));
+	//eu->termina = false;
 	TCHAR buf[BUFFER];
 	while (!eu->termina) {
 		if (!firstRun) {
@@ -109,7 +99,7 @@ DWORD WINAPI ThreadPassageiroWrite(LPVOID lparam) {
 		fSuccess = WriteFile(hPipe, eu, Ps_Sz, &cbWritten, &OverlWr);
 
 		WaitForSingleObject(WriteReady, INFINITE);
-		//_tprintf(TEXT("\nWrite concluido\n"));
+		_tprintf(TEXT("\nWrite concluido\n"));
 
 		GetOverlappedResult(hPipe, &OverlWr, &cbWritten, FALSE);
 
@@ -170,12 +160,6 @@ int _tmain(int argc, TCHAR* argv[]) {
 	hThread[1] = CreateThread(NULL, 0, ThreadPassageiroWrite, (LPVOID)&eu, 0, 0);
 	DWORD result;
 	result = WaitForMultipleObjects(2, hThread, FALSE, INFINITE);
-	if (result == WAIT_OBJECT_0) {
-		_tprintf(TEXT("ThreadPassageiroReader\n"));
-	}
-	if (result == WAIT_OBJECT_0+1) {
-		_tprintf(TEXT("ThreadPassageiroWriter\n"));
-	}
 
 	HANDLE WriteReady;
 	OVERLAPPED OverlWr = { 0 };
@@ -196,44 +180,5 @@ int _tmain(int argc, TCHAR* argv[]) {
 	CloseHandle(hPipe);
 	
 	return 0;
-
-
-
-	//	//	//_tprintf(TEXT("\nA enviar %d bytes: \"%s\""), Msg_Sz, MsgToSend.msg);
-
-	//	ZeroMemory(&OverlWr, sizeof(OverlWr));
-	//	ResetEvent(WriteReady);
-	//	OverlWr.hEvent = WriteReady;
-
-	//	fSuccess = WriteFile(hPipe, &eu, Ps_Sz, &cbWritten, &OverlWr);
-
-	//	WaitForSingleObject(WriteReady, INFINITE);
-	//	//_tprintf(TEXT("\nWrite concluido\n"));
-
-	//	GetOverlappedResult(hPipe, &OverlWr, &cbWritten, FALSE);
-
-	//	//if (ReaderAlive) {
-	//	//	WaitForSingleObject(hThread, 3000);
-	//	//	//_tprintf(TEXT("\nThread reader encerrada\n"));
-	//	//}
-	//	//_tprintf(TEXT("Mensagem enviada\n"));
-	//	if (!DeveContinuar || eu.termina) {
-	//		break;
-	//	}
-	//	firstRun = false;
-	//}
-	////_tprintf(TEXT("Encerrar a thread ouvinte\n"));
-
-	////DeveContinuar = 0;
-	////if (ReaderAlive) {
-	////	WaitForSingleObject(hThread, 3000);
-	////	//_tprintf(TEXT("\nThread reader encerrada\n"));
-	////}
-	////_tprintf(TEXT("\nCliente vai terminar a ligacao\n"));
-
-	//CloseHandle(WriteReady);
-	//CloseHandle(hPipe);
-	//pressEnter();
-	//return 0;
 }
 
