@@ -8,18 +8,13 @@
 #include "../util.h"
 #include "SO2_TP_DLL_2021.h"
 
-#define BUFFER 200
-
 Aviao getAviao(Aviao a, TDados dados) {
-	//WaitForSingleObject(dados.mutex, INFINITE);
 	for (int i = 0; i <= dados.ptr_memoria->navioes; i++) {
 		if (a.id == dados.ptr_memoria->avioes[i].id) {
-		//	ReleaseMutex(dados.mutex);
 			return dados.ptr_memoria->avioes[i];
 		}
 	}
-	//ReleaseMutex(dados.mutex);
-	//return;
+	return;
 }
 
 DWORD WINAPI stop(LPVOID param) {
@@ -57,7 +52,6 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR inicio
 
-
 		// esperar semáforo vazio e o mutex
 		WaitForSingleObject((*dados)->sem_vazios, INFINITE);
 		WaitForSingleObject((*dados)->mutex, INFINITE);
@@ -73,7 +67,6 @@ DWORD WINAPI DeslocaAviao(LPVOID param) {
 		ReleaseSemaphore((*dados)->sem_itens, 1, NULL);
 
 		// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR fim
-
 
 		// imprimir a posicao atual do aviao
 		_tprintf(TEXT("Aviao na posicao %d %d\n"), (*dados)->self.x, (*dados)->self.y);
@@ -199,7 +192,6 @@ DWORD WINAPI leComandos(LPVOID param) {
 					if (result == WAIT_OBJECT_0) {								// caso acabe a viagem espera pelo enter do utilizador
 						WaitForSingleObject(hThread[1], INFINITE);
 						_tprintf(TEXT("\nViagem concluída com sucesso.\n"));
-						//dados->ptr_memoria->avioes[dados->self.pos].dest = false;
 					}
 					if (result == WAIT_OBJECT_0 + 1) {							// caso contrário sai termina
 						_tprintf(TEXT("\nViagem interrompida em voo, o avião despenhou-se.\n"));
@@ -216,33 +208,38 @@ DWORD WINAPI leComandos(LPVOID param) {
 			}
 		}
 		if (_tcsicmp(comando, TEXT("embarcar")) == 0) {
-			dados->self.embarcar = true;
-			// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR inicio
+			if (destino) {
+				dados->self.embarcar = true;
+				// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR inicio
 
-			// esperar semáforo vazio e o mutex
-			WaitForSingleObject(dados->sem_vazios, INFINITE);
-			WaitForSingleObject(dados->mutex, INFINITE);
+				// esperar semáforo vazio e o mutex
+				WaitForSingleObject(dados->sem_vazios, INFINITE);
+				WaitForSingleObject(dados->mutex, INFINITE);
 
-			// copiar o avião
-			CopyMemory(&dados->ptr_modelo->avioesBuffer[dados->ptr_modelo->saiAviao], &dados->self, sizeof(Aviao));
-			dados->ptr_modelo->saiAviao = (dados->ptr_modelo->saiAviao + 1) % TAM; // incrementar a posicao de escrita
+				// copiar o avião
+				CopyMemory(&dados->ptr_modelo->avioesBuffer[dados->ptr_modelo->saiAviao], &dados->self, sizeof(Aviao));
+				dados->ptr_modelo->saiAviao = (dados->ptr_modelo->saiAviao + 1) % TAM; // incrementar a posicao de escrita
 
-			// assinalar mutex
-			ReleaseMutex(dados->mutex);
+				// assinalar mutex
+				ReleaseMutex(dados->mutex);
 
-			// assinala semáforo
-			ReleaseSemaphore(dados->sem_itens, 1, NULL);
+				// assinala semáforo
+				ReleaseSemaphore(dados->sem_itens, 1, NULL);
 
-			// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR final
+				// MODELO CONSUMIDOR ------ N PRODUTORES 1 CONSUMIDOR final
 
-			HANDLE setDestino;
-			setDestino = CreateEvent(NULL, FALSE, FALSE, EVENTO_COMANDOS);
-			if (setDestino == NULL) {
-				return -1;
+				HANDLE setDestino;
+				setDestino = CreateEvent(NULL, FALSE, FALSE, EVENTO_COMANDOS);
+				if (setDestino == NULL) {
+					return -1;
+				}
+				WaitForSingleObject(setDestino, INFINITE); // sincronizar a receção do aeroporto por parte do controlador
+
+				dados->self = getAviao(dados->self, *dados); // obter o novo avião com o embarque feito
 			}
-			WaitForSingleObject(setDestino, INFINITE); // sincronizar a receção do aeroporto por parte do controlador
-
-			dados->self = getAviao(dados->self, *dados); // obter o novo avião com o destino definido
+			else {
+				_tprintf(TEXT("Tem que definir um destino primeiro.\n"));
+			}
 		}
 	} while (_tcsicmp(cmd, TEXT("fim")) != 0);
 
@@ -314,9 +311,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	// obtem os dados passados por argumento da linha de comando -> aeroporto inicial e velocidade 
 	_tcscpy_s(dados.self.inicial.nome, BUFFER, argv[1]);
 	dados.self.velocidade = _tstoi(argv[2]);
-
-	// DEBUG *E*E#*P*FEKFEA
-	dados.self.lotacao = 10;
+	dados.self.lotacao = _tstoi(argv[3]);
 
 	// inicializar a memoria partilhada
 	objMapMem = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(Memoria), MEMORIA);
@@ -398,8 +393,6 @@ int _tmain(int argc, TCHAR* argv[]) {
 	if (result == WAIT_OBJECT_0 + 2) {
 		_tprintf(TEXT("O controlador terminou este aviao.\n"));
 	}
-	
-	//ReleaseSemaphore(dados.sem_itens, 1, NULL);
 	
 	UnmapViewOfFile(dados.ptr_memoria);
 	UnmapViewOfFile(dados.ptr_modelo);

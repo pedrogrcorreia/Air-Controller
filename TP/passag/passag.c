@@ -24,21 +24,27 @@ DWORD WINAPI ThreadPassageiroReader(LPVOID lpvParam) {
 	BOOL fSuccess = FALSE;
 	Passageiro* eu = (Passageiro*)lpvParam;
 	HANDLE hPipe = eu->hPipe;
-
-	HANDLE ReadReady;
 	OVERLAPPED OverlRd = { 0 };
+	DWORD result;
+	HANDLE ev[2];
 
-	ReadReady = CreateEvent(NULL, TRUE, FALSE, NULL);
+	ev[0] = CreateEvent(NULL, TRUE, FALSE, NULL);
 	
 	while (!eu->termina) {
 		ZeroMemory(&OverlRd, sizeof(OverlRd));
-		OverlRd.hEvent = ReadReady;
-		ResetEvent(ReadReady);
-
+		OverlRd.hEvent = ev[0];
+		ResetEvent(ev[0]);
+		LARGE_INTEGER instante;
 		fSuccess = ReadFile(hPipe, &FromServer, Ps_Sz, &cbBytesRead, &OverlRd);
-
-		WaitForSingleObject(ReadReady, INFINITE);
-
+		instante.QuadPart = eu->espera * -10000000;
+		ev[1] = CreateWaitableTimer(NULL, TRUE, NULL);
+		SetWaitableTimer(ev[1], &instante, 0, NULL, NULL, 0);
+		//WaitForSingleObject(ReadReady, INFINITE);
+		result = WaitForMultipleObjects(2, ev, FALSE, INFINITE);
+		if(result == WAIT_OBJECT_0+1) {
+			_tprintf(TEXT("Excedeu o tempo de espera.\nA terminar."));
+			break;
+		}
 		GetOverlappedResult(hPipe, &OverlRd, &cbBytesRead, FALSE);
 
 		if (_tcsicmp(FromServer.mensagem, TEXT("Registo")) == 0) {
@@ -66,7 +72,8 @@ DWORD WINAPI ThreadPassageiroReader(LPVOID lpvParam) {
 		}
 
 	}
-	CloseHandle(ReadReady);
+	CloseHandle(ev[0]);
+	CloseHandle(ev[1]);
 	return 1;
 }
 
@@ -74,14 +81,13 @@ DWORD WINAPI ThreadPassageiroReader(LPVOID lpvParam) {
 DWORD WINAPI ThreadPassageiroWrite(LPVOID lparam) {
 	Passageiro* eu = (Passageiro*)lparam;
 	BOOL fSuccess = FALSE;
-	DWORD cbWritten, dwMode;
+	DWORD cbWritten;
 	HANDLE WriteReady;
 	OVERLAPPED OverlWr = { 0 };
 	HANDLE hPipe = eu->hPipe;
 	WriteReady = CreateEvent(NULL, TRUE, FALSE, NULL);
 	bool firstRun = true;
 	_tprintf(TEXT("Ligacao feita ao Controlador Aéreo.\n"));
-	//eu->termina = false;
 	TCHAR buf[BUFFER];
 	while (!eu->termina) {
 		if (!firstRun) {
@@ -99,8 +105,7 @@ DWORD WINAPI ThreadPassageiroWrite(LPVOID lparam) {
 		fSuccess = WriteFile(hPipe, eu, Ps_Sz, &cbWritten, &OverlWr);
 
 		WaitForSingleObject(WriteReady, INFINITE);
-		_tprintf(TEXT("\nWrite concluido\n"));
-
+		
 		GetOverlappedResult(hPipe, &OverlWr, &cbWritten, FALSE);
 
 		if (eu->termina) {
@@ -110,7 +115,6 @@ DWORD WINAPI ThreadPassageiroWrite(LPVOID lparam) {
 	}
 
 	CloseHandle(WriteReady);
-	//pressEnter();
 	return 0;
 
 }
@@ -138,7 +142,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	_tcscpy_s(eu.destino, BUFFER, argv[2]);
 	_tcscpy_s(eu.nome, BUFFER, argv[3]);
 	if (argc > 4) {
-		eu.espera = _tstoi(argv[4]) * 1000;
+		eu.espera = _tstoi(argv[4]) * 60;
 	}
 	eu.termina = false;
 	eu.voo = -1;
@@ -171,10 +175,6 @@ int _tmain(int argc, TCHAR* argv[]) {
 	eu.termina = true;
 	
 	fSuccess = WriteFile(hPipe, &eu, Ps_Sz, &cbWritten, &OverlWr);
-
-	//WaitForSingleObject(WriteReady, INFINITE);
-
-	//GetOverlappedResult(hPipe, &OverlWr, &cbWritten, FALSE);
 
 	CloseHandle(WriteReady);
 	CloseHandle(hPipe);

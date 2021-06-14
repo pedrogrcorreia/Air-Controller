@@ -24,14 +24,4 @@
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="aviao.rc">
-      <Filter>Resource Files</Filter>
-    </ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="..\..\imagens\aviao.bmp">
-      <Filter>Resource Files</Filter>
-    </Image>
-  </ItemGroup>
 </Project>
