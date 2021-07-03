@@ -142,7 +142,6 @@
   <ItemGroup>
     <ClCompile Include="aeroporto.c" />
     <ClCompile Include="control.c" />
-    <ClCompile Include="controlConsole.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h" />
