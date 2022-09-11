@@ -1,13 +1,15 @@
 # Air Traffic Controller
 
-## Trabalho Prático Sistemas Operativos II 2020/2021 ISEC
+## Simulate Air Traffic
+
+Project developed to college focused on the following learnings: 
 
 - Synchronization mechanisms on Win32 API (mutex, threads, semaphores)
 - Named Pipes (server/client multithreaded with overlapped I/O)
-- Win32 GUI
+- Win32 Desktop Application
 
 ### Required
-- Visual Studio
+- Microsoft Visual C++ version 5.0
 
 ### Run
 ``` control ```</br>
